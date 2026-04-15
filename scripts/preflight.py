@@ -6,10 +6,10 @@ import shutil
 import subprocess
 from pathlib import Path
 
-REQUIRED_METAAUDIT_COLS = {"review_id", "abstract", "methods", "conclusion"}
+REQUIRED_METAAUDIT_COLS = {"ma_id", "module", "severity", "detail"}
 METAAUDIT_CANDIDATES = [
-    Path(r"C:\MetaAudit\outputs\reviews.csv"),
-    Path(r"D:\MetaAudit\outputs\reviews.csv"),
+    Path(r"C:\MetaAudit\results\audit_results.csv"),
+    Path(r"D:\MetaAudit\results\audit_results.csv"),
 ]
 
 def check_metaaudit():
@@ -43,12 +43,12 @@ def check_r():
         return False, f"Rscript not found at {rscript}"
     try:
         r = subprocess.run(
-            [rscript, "-e", "cat(as.character(packageVersion('RBesT')), packageVersion('metafor'))"],
+            [rscript, "-e", "cat(as.character(packageVersion('metafor')))"],
             capture_output=True, text=True, timeout=30,
         )
         if r.returncode != 0:
-            return False, f"Rscript failed: {r.stderr.strip()}"
-        return True, f"OK: {rscript} — {r.stdout.strip()}"
+            return False, f"Rscript failed (metafor likely not installed): {r.stderr.strip()}"
+        return True, f"OK: {rscript} — metafor {r.stdout.strip()}"
     except Exception as e:
         return False, f"Rscript invocation error: {e}"
 
@@ -68,7 +68,7 @@ def main():
         ("Python dependencies", check_python_deps),
         ("MetaAudit corpus", check_metaaudit),
         ("TRUTHCERT_HMAC_KEY", check_hmac_key),
-        ("R + RBesT + metafor", check_r),
+        ("R + metafor", check_r),
     ]
     failed = 0
     for name, fn in checks:
