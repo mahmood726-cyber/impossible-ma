@@ -128,7 +128,39 @@
       </section>
       <section class="tab-pane" data-pane="adversarial">
         <h2>adversarial - worst/best defensible pool</h2>
-        <p>Form lands in Task 7.</p>
+        <div class="row">
+          <label>Built-in dataset:
+            <select id="adv-dataset">
+              <option value="">-- choose --</option>
+              <option value="pcsk9">PCSK9 inhibitors (12 studies)</option>
+              <option value="ace_legacy">Legacy ACE-I question (18 studies)</option>
+              <option value="covid_early">COVID early treatment (14 studies)</option>
+            </select>
+          </label>
+          <button id="adv-load">Load</button>
+          <span> or </span>
+          <label>CSV upload: <input type="file" id="adv-csv" accept=".csv" /></label>
+        </div>
+        <fieldset>
+          <legend>Studies (&gt;=3 needed; columns: study, estimate, se, rob, n, followup, language, pub_type)</legend>
+          <table id="adv-studies">
+            <thead><tr>
+              <th>study</th><th>estimate</th><th>se</th><th>rob</th>
+              <th>n</th><th>followup</th><th>language</th><th>pub_type</th><th></th>
+            </tr></thead>
+            <tbody></tbody>
+          </table>
+          <button id="adv-add-row">+ Add row</button>
+        </fieldset>
+        <button id="adv-run" disabled>Run adversarial</button>
+        <div id="adv-error" class="error" hidden></div>
+        <div id="adv-result" hidden>
+          <h3>Envelope</h3>
+          <div id="adv-viz"></div>
+          <details><summary>Raw JSON</summary><pre id="adv-json"></pre></details>
+          <button id="adv-export-json">Download signed JSON</button>
+          <button id="adv-export-report">Printable report</button>
+        </div>
       </section>
     </main>
     <footer id="footer">
@@ -453,6 +485,140 @@ json.dumps(asdict(env), default=float)
       document.getElementById(id).addEventListener('input', msValidateRun);
     });
     document.getElementById('ms-run').addEventListener('click', msRun);
+
+    // ---- adversarial tab ----
+    const BUILTIN_ADV = {
+      pcsk9: [
+        {study:'PCSK-1', estimate:-0.30, se:0.10, rob:'low',      n:300, followup:24, language:'english', pub_type:'peer'},
+        {study:'PCSK-2', estimate:-0.25, se:0.12, rob:'low',      n:250, followup:18, language:'english', pub_type:'peer'},
+        {study:'PCSK-3', estimate:-0.35, se:0.15, rob:'some',     n:180, followup:12, language:'english', pub_type:'peer'},
+        {study:'PCSK-4', estimate:-0.40, se:0.18, rob:'moderate', n:120, followup:12, language:'english', pub_type:'peer'},
+        {study:'PCSK-5', estimate:-0.20, se:0.20, rob:'high',     n: 80, followup: 6, language:'other',   pub_type:'peer'},
+        {study:'PCSK-6', estimate:-0.45, se:0.22, rob:'some',     n:200, followup:24, language:'english', pub_type:'peer'},
+        {study:'PCSK-7', estimate:-0.10, se:0.25, rob:'high',     n: 60, followup: 6, language:'english', pub_type:'grey'},
+        {study:'PCSK-8', estimate:-0.55, se:0.14, rob:'low',      n:400, followup:36, language:'english', pub_type:'peer'},
+        {study:'PCSK-9', estimate:-0.32, se:0.11, rob:'low',      n:350, followup:24, language:'english', pub_type:'peer'},
+        {study:'PCSK-10',estimate:-0.28, se:0.13, rob:'some',     n:220, followup:18, language:'english', pub_type:'peer'},
+        {study:'PCSK-11',estimate:-0.05, se:0.30, rob:'high',     n: 50, followup: 3, language:'other',   pub_type:'grey'},
+        {study:'PCSK-12',estimate:-0.38, se:0.16, rob:'moderate', n:150, followup:12, language:'english', pub_type:'peer'},
+      ],
+      ace_legacy: Array.from({length: 18}, (_, i) => ({
+        study: `ACE-${i+1}`,
+        estimate: -0.25 + (i % 5) * 0.05 - (i % 3) * 0.04,
+        se: 0.10 + (i % 4) * 0.04,
+        rob: ['low','some','moderate','high'][i % 4],
+        n: 100 + (i * 30) % 400,
+        followup: [6, 12, 24, 36][i % 4],
+        language: i % 7 === 0 ? 'other' : 'english',
+        pub_type: i === 17 ? 'grey' : 'peer',
+      })),
+      covid_early: Array.from({length: 14}, (_, i) => ({
+        study: `COV-${i+1}`,
+        estimate: -0.10 + (i % 6) * 0.08 - 0.20,
+        se: 0.12 + (i % 5) * 0.05,
+        rob: ['low','some','moderate','high'][(i+1) % 4],
+        n: 80 + (i * 25) % 300,
+        followup: [3, 6, 12][i % 3],
+        language: i % 6 === 0 ? 'other' : 'english',
+        pub_type: (i % 8 === 0) ? 'grey' : 'peer',
+      })),
+    };
+
+    const ADV_COLS = ['study','estimate','se','rob','n','followup','language','pub_type'];
+
+    function advAddRow(row = {}) {
+      const tbody = document.querySelector('#adv-studies tbody');
+      const tr = document.createElement('tr');
+      tr.innerHTML = ADV_COLS.map(c => {
+        const v = row[c] != null ? row[c] : '';
+        const type = ['estimate','se'].includes(c) ? 'number' :
+                     (['n','followup'].includes(c) ? 'number' : 'text');
+        const step = ['estimate','se'].includes(c) ? 'step="0.01"' : '';
+        return `<td><input type="${type}" ${step} class="adv-${c}" value="${v}" /></td>`;
+      }).join('') + `<td><button class="adv-row-del">x</button></td>`;
+      tr.querySelector('.adv-row-del').addEventListener('click', () => { tr.remove(); advValidateRun(); });
+      for (const inp of tr.querySelectorAll('input')) inp.addEventListener('input', advValidateRun);
+      tbody.appendChild(tr);
+      advValidateRun();
+    }
+
+    function advLoadDataset(name) {
+      const rows = BUILTIN_ADV[name];
+      if (!rows) return;
+      document.querySelector('#adv-studies tbody').innerHTML = '';
+      for (const r of rows) advAddRow(r);
+    }
+
+    function advReadStudies() {
+      const studies = [];
+      for (const tr of document.querySelectorAll('#adv-studies tbody tr')) {
+        const obj = {};
+        for (const c of ADV_COLS) {
+          const v = tr.querySelector('.adv-' + c).value;
+          if (['estimate','se'].includes(c)) obj[c] = parseFloat(v);
+          else if (['n','followup'].includes(c)) obj[c] = parseInt(v, 10);
+          else obj[c] = v;
+        }
+        studies.push(obj);
+      }
+      return studies;
+    }
+
+    function advValidateRun() {
+      const studies = advReadStudies();
+      const ok = studies.length >= 3 && studies.every(s =>
+        Number.isFinite(s.estimate) && Number.isFinite(s.se) && s.se > 0
+        && Number.isFinite(s.n) && Number.isFinite(s.followup)
+        && s.rob && s.language && s.pub_type
+      );
+      document.getElementById('adv-run').disabled = !ok;
+    }
+
+    function advParseCsv(text) {
+      const lines = text.trim().split(/\r?\n/);
+      if (lines.length < 2) throw new Error('CSV has no data rows');
+      const header = lines[0].split(',').map(h => h.trim());
+      const missing = ADV_COLS.filter(c => !header.includes(c));
+      if (missing.length) throw new Error('CSV missing columns: ' + missing.join(', '));
+      const idx = ADV_COLS.map(c => header.indexOf(c));
+      const rows = [];
+      for (let i = 1; i < lines.length; i++) {
+        const cells = lines[i].split(',').map(s => s.trim());
+        const r = {};
+        ADV_COLS.forEach((c, j) => {
+          const v = cells[idx[j]];
+          r[c] = ['estimate','se'].includes(c) ? parseFloat(v)
+               : ['n','followup'].includes(c) ? parseInt(v, 10)
+               : v;
+        });
+        rows.push(r);
+      }
+      return rows;
+    }
+
+    document.getElementById('adv-load').addEventListener('click', () => {
+      const name = document.getElementById('adv-dataset').value;
+      if (name) advLoadDataset(name);
+    });
+    document.getElementById('adv-add-row').addEventListener('click', () => advAddRow());
+    document.getElementById('adv-csv').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const errBox = document.getElementById('adv-error');
+      errBox.hidden = true;
+      try {
+        const text = await file.text();
+        const rows = advParseCsv(text);
+        document.querySelector('#adv-studies tbody').innerHTML = '';
+        for (const r of rows) advAddRow(r);
+      } catch (err) {
+        errBox.textContent = err.message;
+        errBox.hidden = false;
+      }
+    });
+    window.addEventListener('DOMContentLoaded', () => {
+      for (let i = 0; i < 3; i++) advAddRow();
+    });
 
     bootstrap();
   </script>
