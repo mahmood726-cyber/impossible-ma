@@ -118,3 +118,24 @@ def test_missing_se_envelope_disagreeing_routes_collapse_none():
     env = missing_se_envelope(inp)
     assert env.point is None
     assert env.lower < env.upper
+
+
+def test_missing_se_regression():
+    baseline = json.loads((FIXTURES / "missing_se_baseline.json").read_text())
+    cases = {
+        "all_three_agree": MissingSeInput(
+            effect=0.4, p_value=0.04, ci_lower=0.0, ci_upper=0.8, statistic=2.0, df=None
+        ),
+        "single_p": MissingSeInput(effect=0.5, p_value=0.05),
+        "disagreeing": MissingSeInput(
+            effect=0.4, p_value=0.001, ci_lower=0.0, ci_upper=0.01
+        ),
+    }
+    for name, inp in cases.items():
+        env = missing_se_envelope(inp)
+        b = baseline[name]
+        assert abs(env.lower - b["lower"]) < 1e-9, name
+        assert abs(env.upper - b["upper"]) < 1e-9, name
+        assert (env.point is None) == (b["point"] is None), name
+        if env.point is not None:
+            assert abs(env.point - b["point"]) < 1e-9, name
