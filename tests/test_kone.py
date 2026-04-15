@@ -1,6 +1,9 @@
+import json
 from pathlib import Path
+
 import pandas as pd
 import pytest
+
 from impossible_ma.kone import fit_map_prior, KoneInput, kone_envelope
 from impossible_ma.envelope import validate_envelope
 
@@ -71,3 +74,19 @@ def test_kone_envelope_min_info_mentions_additional_trial(adjacent):
     )
     env = kone_envelope(inp)
     assert "additional trial" in env.min_info.lower() or "more trial" in env.min_info.lower()
+
+
+def test_kone_regression_baseline(adjacent):
+    baseline = json.loads((FIXTURES / "kone_baseline.json").read_text())
+    inp = KoneInput(
+        target_estimate=-0.50,
+        target_se=0.25,
+        adjacent=adjacent,
+        endpoint="binary",
+    )
+    env = kone_envelope(inp)
+    assert abs(env.lower - baseline["lower"]) < 1e-6
+    assert abs(env.upper - baseline["upper"]) < 1e-6
+    assert abs(env.point - baseline["point"]) < 1e-6
+    assert abs(env.case_specific["mu_prior"] - baseline["mu_prior"]) < 1e-6
+    assert abs(env.case_specific["tau"] - baseline["tau"]) < 1e-6
