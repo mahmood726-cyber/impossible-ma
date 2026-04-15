@@ -247,6 +247,42 @@ print('ImpossibleMA loaded:', impossible_ma.__version__)
       k1AddRow(); k1AddRow(); k1AddRow();
     });
 
+    async function k1Run() {
+      const errBox = document.getElementById('k1-error');
+      const result = document.getElementById('k1-result');
+      errBox.hidden = true; result.hidden = true;
+      if (!window.PYODIDE_READY) {
+        errBox.textContent = 'Engine not ready yet.'; errBox.hidden = false; return;
+      }
+      const inp = k1ReadInputs();
+      try {
+        window.PYODIDE.globals.set('K1_INPUT', window.PYODIDE.toPy(inp));
+        const result_json = await window.PYODIDE.runPythonAsync(`
+import json
+from impossible_ma.kone import KoneInput, kone_envelope
+from dataclasses import asdict
+_inp = K1_INPUT.to_py()
+inp = KoneInput(
+    target_estimate=_inp['target_estimate'],
+    target_se=_inp['target_se'],
+    adjacent=[tuple(a) for a in _inp['adjacent']],
+    endpoint=_inp['endpoint'],
+)
+env = kone_envelope(inp)
+json.dumps(asdict(env), default=float)
+        `);
+        const env = JSON.parse(result_json);
+        document.getElementById('k1-json').textContent = JSON.stringify(env, null, 2);
+        window.K1_LAST_ENVELOPE = env;
+        document.getElementById('k1-result').hidden = false;
+      } catch (err) {
+        errBox.textContent = 'Error: ' + (err.message || String(err));
+        errBox.hidden = false;
+      }
+    }
+
+    document.getElementById('k1-run').addEventListener('click', k1Run);
+
     bootstrap();
   </script>
 </body>
