@@ -322,12 +322,11 @@ print('ImpossibleMA loaded:', impossible_ma.__version__)
 import json
 from impossible_ma.kone import KoneInput, kone_envelope
 from dataclasses import asdict
-_inp = K1_INPUT.to_py()
 inp = KoneInput(
-    target_estimate=_inp['target_estimate'],
-    target_se=_inp['target_se'],
-    adjacent=[tuple(a) for a in _inp['adjacent']],
-    endpoint=_inp['endpoint'],
+    target_estimate=K1_INPUT['target_estimate'],
+    target_se=K1_INPUT['target_se'],
+    adjacent=[tuple(a) for a in K1_INPUT['adjacent']],
+    endpoint=K1_INPUT['endpoint'],
 )
 env = kone_envelope(inp)
 json.dumps(asdict(env), default=float)
@@ -438,7 +437,7 @@ json.dumps(asdict(env), default=float)
 import json
 from impossible_ma.missing_se import MissingSeInput, missing_se_envelope
 from dataclasses import asdict
-inp = MissingSeInput(**MS_KW.to_py())
+inp = MissingSeInput(**MS_KW)
 env = missing_se_envelope(inp)
 json.dumps(asdict(env), default=float)
         `);
@@ -635,7 +634,7 @@ import json
 import pandas as pd
 from impossible_ma.adversarial import adversarial_envelope
 from dataclasses import asdict
-df = pd.DataFrame(ADV_STUDIES.to_py())
+df = pd.DataFrame(list(ADV_STUDIES))
 env = adversarial_envelope(df)
 json.dumps(asdict(env), default=float)
         `);
@@ -694,7 +693,7 @@ json.dumps(asdict(env), default=float)
 import json, os
 os.environ['TRUTHCERT_HMAC_KEY'] = SIG_KEY
 from impossible_ma.truthcert import sign_bundle
-bundle = sign_bundle(SIG_PAYLOAD.to_py())
+bundle = sign_bundle(SIG_PAYLOAD)
 json.dumps(bundle, default=float)
       `);
       const blob = new Blob([bundle_json], { type: 'application/json' });
@@ -724,7 +723,7 @@ json.dumps(bundle, default=float)
 import json, os
 os.environ['TRUTHCERT_HMAC_KEY'] = SIG_KEY
 from impossible_ma.truthcert import sign_bundle
-json.dumps(sign_bundle(SIG_PAYLOAD.to_py()), default=float)
+json.dumps(sign_bundle(SIG_PAYLOAD), default=float)
         `);
         bundle = JSON.parse(bundle_json);
       }
