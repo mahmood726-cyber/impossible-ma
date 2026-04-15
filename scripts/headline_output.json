@@ -1,0 +1,13 @@
+{
+  "corpus": "C:\\MetaAudit\\results\\audit_results.csv",
+  "n_rows_total": 68519,
+  "n_ma_total": 6229,
+  "denominator_critical": 444,
+  "numerator_by_case": {},
+  "numerator_total": 0,
+  "unclassified_count": 444,
+  "critical_module_frequency": {
+    "prediction_gap": 444
+  },
+  "k_lookup_coverage": 6021
+}
