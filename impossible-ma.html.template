@@ -712,6 +712,63 @@ json.dumps(bundle, default=float)
     document.getElementById('adv-export-json').addEventListener('click',
       () => signAndDownload(window.ADV_LAST_ENVELOPE, 'adversarial'));
 
+    // ---- Printable HTML report ----
+    async function printableReport(envelope, caseName) {
+      if (!envelope) { alert('Run the analysis first.'); return; }
+      const key = (document.getElementById('truthcert-key').value || '').trim();
+      let bundle = null;
+      if (key.length >= 32 && window.PYODIDE_READY) {
+        window.PYODIDE.globals.set('SIG_PAYLOAD', window.PYODIDE.toPy(envelope));
+        window.PYODIDE.globals.set('SIG_KEY', key);
+        const bundle_json = await window.PYODIDE.runPythonAsync(`
+import json, os
+os.environ['TRUTHCERT_HMAC_KEY'] = SIG_KEY
+from impossible_ma.truthcert import sign_bundle
+json.dumps(sign_bundle(SIG_PAYLOAD.to_py()), default=float)
+        `);
+        bundle = JSON.parse(bundle_json);
+      }
+
+      const vizId = caseName === 'k1' ? 'k1-viz'
+                  : caseName === 'missing_se' ? 'ms-viz' : 'adv-viz';
+      const vizDiv = document.getElementById(vizId);
+      let svgHtml = '';
+      try {
+        const png = await Plotly.toImage(vizDiv, { format: 'svg', width: 800, height: 400 });
+        svgHtml = `<img src="${png}" alt="visualization" style="max-width:100%" />`;
+      } catch (e) {
+        svgHtml = '<p><em>(visualization unavailable)</em></p>';
+      }
+
+      const reportHtml = `<!doctype html><html><head><meta charset="utf-8"/>
+<title>ImpossibleMA report — ${caseName}</title>
+<style>body{font-family:system-ui;max-width:800px;margin:2em auto;padding:0 1em}
+pre{background:#f4f4f4;padding:0.8em;overflow-x:auto;font-size:0.85em}
+table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:0.3em 0.6em}</style></head>
+<body>
+<h1>ImpossibleMA report</h1>
+<p><strong>Case:</strong> ${caseName} | <strong>Generated:</strong> ${new Date().toISOString()}</p>
+<h2>Envelope</h2>
+<table><tr><th>lower</th><td>${envelope.lower}</td></tr>
+<tr><th>upper</th><td>${envelope.upper}</td></tr>
+<tr><th>point</th><td>${envelope.point ?? '—'}</td></tr>
+<tr><th>min_info</th><td>${envelope.min_info}</td></tr></table>
+<h2>Visualization</h2>${svgHtml}
+<h2>Raw envelope</h2><pre>${JSON.stringify(envelope, null, 2)}</pre>
+${bundle ? `<h2>TruthCert signature</h2><pre>${bundle.signature}</pre><p>Algorithm: ${bundle.alg}</p>` : '<p><em>(unsigned — paste a TruthCert key in the app footer to include the signature)</em></p>'}
+</body></html>`;
+
+      const w = window.open('', '_blank');
+      w.document.write(reportHtml); w.document.close();
+    }
+
+    document.getElementById('k1-export-report').addEventListener('click',
+      () => printableReport(window.K1_LAST_ENVELOPE, 'k1'));
+    document.getElementById('ms-export-report').addEventListener('click',
+      () => printableReport(window.MS_LAST_ENVELOPE, 'missing_se'));
+    document.getElementById('adv-export-report').addEventListener('click',
+      () => printableReport(window.ADV_LAST_ENVELOPE, 'adversarial'));
+
     bootstrap();
   </script>
 </body>
