@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>ImpossibleMA — Synthesize the previously unsynthesizable</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; padding: 0; }
+    #splash { position: fixed; inset: 0; background: #111; color: #eee;
+              display: flex; flex-direction: column; align-items: center;
+              justify-content: center; z-index: 1000; font-family: monospace; }
+    #splash h1 { font-size: 1.8rem; margin-bottom: 1rem; }
+    #splash p { margin: 0.3rem; }
+    #app { display: none; padding: 1rem 2rem; max-width: 1200px; margin: 0 auto; }
+    #app.ready { display: block; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.27.7/full/pyodide.js"></script>
+  <script id="impossible-ma-wheel" type="application/octet-stream">__WHEEL_BASE64__</script>
+</head>
+<body>
+  <div id="splash">
+    <h1>ImpossibleMA</h1>
+    <p id="splash-status">Loading Python runtime (~6 MB)...</p>
+  </div>
+  <div id="app">
+    <h1>ImpossibleMA</h1>
+    <p>Engine ready. Tabs land in Task 3.</p>
+  </div>
+  <script>
+    const status = (msg) => { document.getElementById('splash-status').textContent = msg; };
+
+    async function bootstrap() {
+      try {
+        status('Loading Python runtime (~6 MB)...');
+        const pyodide = await loadPyodide({ indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.27.7/full/' });
+
+        status('Installing scipy + numpy + pandas (~40 MB)...');
+        await pyodide.loadPackage(['scipy', 'numpy', 'pandas']);
+
+        status('Installing micropip...');
+        await pyodide.loadPackage('micropip');
+
+        status('Installing ImpossibleMA engine...');
+        const wheelB64 = document.getElementById('impossible-ma-wheel').textContent;
+        const wheelBytes = Uint8Array.from(atob(wheelB64), c => c.charCodeAt(0));
+        // micropip parses the wheel filename, so it must include version tags.
+        const wheelFilename = '/tmp/impossible_ma-0.1.0-py3-none-any.whl';
+        pyodide.FS.writeFile(wheelFilename, wheelBytes);
+        pyodide.globals.set('WHEEL_PATH', wheelFilename);
+        await pyodide.runPythonAsync(`
+import micropip
+await micropip.install('emfs:' + WHEEL_PATH)
+import impossible_ma
+print('ImpossibleMA loaded:', impossible_ma.__version__)
+        `);
+
+        window.PYODIDE = pyodide;
+        window.PYODIDE_READY = true;
+        document.getElementById('splash').style.display = 'none';
+        document.getElementById('app').classList.add('ready');
+      } catch (err) {
+        status('Load failed: ' + err.message);
+        window.PYODIDE_LOAD_ERROR = String(err);
+      }
+    }
+    bootstrap();
+  </script>
+</body>
+</html>
