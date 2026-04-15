@@ -66,10 +66,10 @@ def driver(server):
 
 @pytest.fixture
 def page(driver):
-    driver.get(PAGE_URL)
-    WebDriverWait(driver, 30).until(
-        lambda d: d.execute_script("return window.PYODIDE_READY === true")
-    )
+    # Do NOT reload the page — the module-scoped driver fixture already loaded
+    # Pyodide + the wheel once (~170s). Reloading would force another cold
+    # Pyodide load and blow the per-test timeout. Instead, reset DOM/form
+    # state in-place so tests are isolated without paying the load cost again.
     driver.execute_script("""
         location.hash = '#k1';
         sessionStorage.clear();
@@ -417,3 +417,45 @@ def test_printable_report_opens_new_window(page):
     # Close new window and switch back
     page.close()
     page.switch_to.window(list(initial)[0])
+
+
+def test_raw_json_viewer_toggles(page):
+    Select(page.find_element(By.ID, "k1-dataset")).select_by_value("rare_hf")
+    page.find_element(By.ID, "k1-load").click()
+    WebDriverWait(page, 5).until(
+        lambda d: not d.find_element(By.ID, "k1-run").get_attribute("disabled")
+    )
+    page.find_element(By.ID, "k1-run").click()
+    WebDriverWait(page, 45).until(
+        lambda d: d.execute_script("return window.K1_LAST_ENVELOPE != null")
+    )
+    details = page.find_element(By.CSS_SELECTOR, "#k1-result details")
+    initial_open = details.get_attribute("open")
+    details.click()
+    after_open = details.get_attribute("open")
+    assert initial_open != after_open
+
+
+def test_python_traceback_shown_in_error_pane(page):
+    # Force invalid input that passes JS validation but fails in Python:
+    # a target_se that the JS form-validator lets through but KoneInput raises on
+    # (target_se <= 0). JS validator already blocks this, so we bypass by directly
+    # invoking k1Run after planting bad Python-visible state.
+    page.execute_script(r"""
+        document.getElementById('k1-target-est').value = '-0.4';
+        document.getElementById('k1-target-se').value = '-0.1';
+        if (typeof k1AddRow === 'function') {
+            const tbody = document.querySelector('#k1-adjacent tbody');
+            tbody.innerHTML = '';
+            k1AddRow('A', -0.3, 0.15);
+            k1AddRow('B', -0.25, 0.12);
+            k1AddRow('C', -0.4, 0.18);
+        }
+    """)
+    # JS validator will disable the button; force the handler directly
+    page.execute_script("k1Run();")
+    WebDriverWait(page, 15).until(
+        lambda d: not d.find_element(By.ID, "k1-error").get_attribute("hidden")
+    )
+    err = page.find_element(By.ID, "k1-error").text
+    assert err.lower().startswith("error") or "target_se" in err or "positive" in err
