@@ -13,6 +13,15 @@
     #splash p { margin: 0.3rem; }
     #app { display: none; padding: 1rem 2rem; max-width: 1200px; margin: 0 auto; }
     #app.ready { display: block; }
+    header { border-bottom: 1px solid #ddd; padding-bottom: 0.5rem; }
+    header nav { display: flex; gap: 1rem; margin-top: 0.5rem; }
+    header nav a { padding: 0.4rem 0.8rem; border: 1px solid #ccc;
+                   border-radius: 4px; text-decoration: none; color: #333; }
+    header nav a.active { background: #333; color: #fff; }
+    .tab-pane { display: none; padding: 1rem 0; }
+    .tab-pane.active { display: block; }
+    footer { border-top: 1px solid #ddd; padding-top: 0.5rem; margin-top: 2rem; font-size: 0.85rem; }
+    footer input { font-family: monospace; width: 32em; }
   </style>
   <script src="https://cdn.jsdelivr.net/pyodide/v0.27.7/full/pyodide.js"></script>
   <script id="impossible-ma-wheel" type="application/octet-stream">__WHEEL_BASE64__</script>
@@ -23,8 +32,33 @@
     <p id="splash-status">Loading Python runtime (~6 MB)...</p>
   </div>
   <div id="app">
-    <h1>ImpossibleMA</h1>
-    <p>Engine ready. Tabs land in Task 3.</p>
+    <header>
+      <h1>ImpossibleMA <small>v0.1</small></h1>
+      <nav id="tabs">
+        <a href="#k1" data-tab="k1">k=1 (single-study)</a>
+        <a href="#missing_se" data-tab="missing_se">missing_se</a>
+        <a href="#adversarial" data-tab="adversarial">adversarial</a>
+      </nav>
+    </header>
+    <main>
+      <section class="tab-pane" data-pane="k1">
+        <h2>k=1 - single-study borrowing</h2>
+        <p>Form lands in Task 3.</p>
+      </section>
+      <section class="tab-pane" data-pane="missing_se">
+        <h2>missing_se - SE reconstruction</h2>
+        <p>Form lands in Task 6.</p>
+      </section>
+      <section class="tab-pane" data-pane="adversarial">
+        <h2>adversarial - worst/best defensible pool</h2>
+        <p>Form lands in Task 7.</p>
+      </section>
+    </main>
+    <footer id="footer">
+      <label>TruthCert key (32+ chars, sessionStorage):
+        <input type="password" id="truthcert-key" minlength="32" />
+      </label>
+    </footer>
   </div>
   <script>
     const status = (msg) => { document.getElementById('splash-status').textContent = msg; };
@@ -63,6 +97,26 @@ print('ImpossibleMA loaded:', impossible_ma.__version__)
         window.PYODIDE_LOAD_ERROR = String(err);
       }
     }
+    function syncTabs() {
+      const hash = location.hash.replace('#', '') || 'k1';
+      for (const link of document.querySelectorAll('#tabs a')) {
+        link.classList.toggle('active', link.dataset.tab === hash);
+      }
+      for (const pane of document.querySelectorAll('.tab-pane')) {
+        pane.classList.toggle('active', pane.dataset.pane === hash);
+      }
+    }
+    window.addEventListener('hashchange', syncTabs);
+    window.addEventListener('DOMContentLoaded', syncTabs);
+
+    const keyInput = document.getElementById('truthcert-key');
+    if (keyInput) {
+      keyInput.value = sessionStorage.getItem('truthcert_key') || '';
+      keyInput.addEventListener('input', () => {
+        sessionStorage.setItem('truthcert_key', keyInput.value);
+      });
+    }
+
     bootstrap();
   </script>
 </body>
