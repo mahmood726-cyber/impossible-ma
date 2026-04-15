@@ -22,6 +22,15 @@
     .tab-pane.active { display: block; }
     footer { border-top: 1px solid #ddd; padding-top: 0.5rem; margin-top: 2rem; font-size: 0.85rem; }
     footer input { font-family: monospace; width: 32em; }
+    fieldset { margin: 0.8rem 0; padding: 0.5rem 1rem; }
+    fieldset label { display: inline-block; margin-right: 1rem; }
+    .row { display: flex; gap: 0.5rem; align-items: center; }
+    .error { color: #b00; background: #fee; padding: 0.5rem; border-radius: 4px; margin: 0.5rem 0; }
+    table { border-collapse: collapse; }
+    th, td { padding: 0.2rem 0.4rem; border: 1px solid #ddd; }
+    input[type="number"] { width: 8em; }
+    input[type="text"] { width: 8em; }
+    button:disabled { opacity: 0.5; }
   </style>
   <script src="https://cdn.jsdelivr.net/pyodide/v0.27.7/full/pyodide.js"></script>
   <script id="impossible-ma-wheel" type="application/octet-stream">__WHEEL_BASE64__</script>
@@ -43,7 +52,46 @@
     <main>
       <section class="tab-pane" data-pane="k1">
         <h2>k=1 - single-study borrowing</h2>
-        <p>Form lands in Task 3.</p>
+        <div class="row">
+          <label>Built-in dataset:
+            <select id="k1-dataset">
+              <option value="">-- choose --</option>
+              <option value="rare_hf">Rare-disease HF trial</option>
+              <option value="novel_device">Novel-device pivotal</option>
+              <option value="single_arm_oncology">Single-arm oncology</option>
+            </select>
+          </label>
+          <button id="k1-load">Load</button>
+        </div>
+        <fieldset>
+          <legend>Target trial</legend>
+          <label>Estimate (log scale): <input type="number" step="0.01" id="k1-target-est" /></label>
+          <label>SE: <input type="number" step="0.01" id="k1-target-se" /></label>
+          <label>Endpoint:
+            <select id="k1-endpoint">
+              <option value="binary">binary (log-OR)</option>
+              <option value="continuous">continuous (SMD)</option>
+              <option value="tte">time-to-event (log-HR)</option>
+            </select>
+          </label>
+        </fieldset>
+        <fieldset>
+          <legend>Adjacent trials (>=3)</legend>
+          <table id="k1-adjacent">
+            <thead><tr><th>Study</th><th>Estimate</th><th>SE</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+          <button id="k1-add-row">+ Add row</button>
+        </fieldset>
+        <button id="k1-run" disabled>Run k=1</button>
+        <div id="k1-error" class="error" hidden></div>
+        <div id="k1-result" hidden>
+          <h3>Envelope</h3>
+          <div id="k1-viz"></div>
+          <details><summary>Raw JSON</summary><pre id="k1-json"></pre></details>
+          <button id="k1-export-json">Download signed JSON</button>
+          <button id="k1-export-report">Printable report</button>
+        </div>
       </section>
       <section class="tab-pane" data-pane="missing_se">
         <h2>missing_se - SE reconstruction</h2>
@@ -116,6 +164,88 @@ print('ImpossibleMA loaded:', impossible_ma.__version__)
         sessionStorage.setItem('truthcert_key', keyInput.value);
       });
     }
+
+    // ---- k=1 tab ----
+    const BUILTIN_K1 = {
+      rare_hf: {
+        target_estimate: -0.42, target_se: 0.31, endpoint: 'binary',
+        adjacent: [
+          ['HF-A', -0.30, 0.15], ['HF-B', -0.25, 0.12],
+          ['HF-C', -0.40, 0.18], ['HF-D', -0.20, 0.20], ['HF-E', -0.35, 0.10],
+        ],
+      },
+      novel_device: {
+        target_estimate: -0.55, target_se: 0.28, endpoint: 'binary',
+        adjacent: [
+          ['DEV-X1', -0.35, 0.18], ['DEV-X2', -0.50, 0.15],
+          ['DEV-X3', -0.45, 0.20], ['DEV-X4', -0.60, 0.22],
+        ],
+      },
+      single_arm_oncology: {
+        target_estimate: 0.62, target_se: 0.30, endpoint: 'continuous',
+        adjacent: [
+          ['ONC-1', 0.55, 0.20], ['ONC-2', 0.70, 0.18], ['ONC-3', 0.50, 0.25],
+        ],
+      },
+    };
+
+    function k1AddRow(study = '', est = '', se = '') {
+      const tbody = document.querySelector('#k1-adjacent tbody');
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td><input type="text" class="k1-study" value="' + study + '" /></td>' +
+        '<td><input type="number" step="0.01" class="k1-est" value="' + est + '" /></td>' +
+        '<td><input type="number" step="0.01" class="k1-se"  value="' + se + '" /></td>' +
+        '<td><button class="k1-row-del">x</button></td>';
+      tr.querySelector('.k1-row-del').addEventListener('click', () => {
+        tr.remove(); k1ValidateRunButton();
+      });
+      for (const inp of tr.querySelectorAll('input')) {
+        inp.addEventListener('input', k1ValidateRunButton);
+      }
+      tbody.appendChild(tr);
+      k1ValidateRunButton();
+    }
+
+    function k1LoadDataset(name) {
+      const d = BUILTIN_K1[name];
+      if (!d) return;
+      document.getElementById('k1-target-est').value = d.target_estimate;
+      document.getElementById('k1-target-se').value = d.target_se;
+      document.getElementById('k1-endpoint').value = d.endpoint;
+      document.querySelector('#k1-adjacent tbody').innerHTML = '';
+      for (const [study, est, se] of d.adjacent) k1AddRow(study, est, se);
+    }
+
+    function k1ReadInputs() {
+      const target_estimate = parseFloat(document.getElementById('k1-target-est').value);
+      const target_se = parseFloat(document.getElementById('k1-target-se').value);
+      const endpoint = document.getElementById('k1-endpoint').value;
+      const adjacent = [];
+      for (const tr of document.querySelectorAll('#k1-adjacent tbody tr')) {
+        const e = parseFloat(tr.querySelector('.k1-est').value);
+        const s = parseFloat(tr.querySelector('.k1-se').value);
+        if (Number.isFinite(e) && Number.isFinite(s)) adjacent.push([e, s]);
+      }
+      return { target_estimate, target_se, endpoint, adjacent };
+    }
+
+    function k1ValidateRunButton() {
+      const inp = k1ReadInputs();
+      const ok = Number.isFinite(inp.target_estimate)
+              && Number.isFinite(inp.target_se) && inp.target_se > 0
+              && inp.adjacent.length >= 3;
+      document.getElementById('k1-run').disabled = !ok;
+    }
+
+    document.getElementById('k1-load').addEventListener('click', () => {
+      const name = document.getElementById('k1-dataset').value;
+      if (name) k1LoadDataset(name);
+    });
+    document.getElementById('k1-add-row').addEventListener('click', () => k1AddRow());
+    window.addEventListener('DOMContentLoaded', () => {
+      k1AddRow(); k1AddRow(); k1AddRow();
+    });
 
     bootstrap();
   </script>
