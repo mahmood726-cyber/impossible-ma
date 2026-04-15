@@ -33,6 +33,7 @@
     button:disabled { opacity: 0.5; }
   </style>
   <script src="https://cdn.jsdelivr.net/pyodide/v0.27.7/full/pyodide.js"></script>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <script id="impossible-ma-wheel" type="application/octet-stream">__WHEEL_BASE64__</script>
 </head>
 <body>
@@ -275,10 +276,40 @@ json.dumps(asdict(env), default=float)
         document.getElementById('k1-json').textContent = JSON.stringify(env, null, 2);
         window.K1_LAST_ENVELOPE = env;
         document.getElementById('k1-result').hidden = false;
+        k1Render(env);
       } catch (err) {
         errBox.textContent = 'Error: ' + (err.message || String(err));
         errBox.hidden = false;
       }
+    }
+
+    function k1Render(env) {
+      const cs = env.case_specific;
+      const xs = [];
+      const lo = Math.min(cs.vague_ci[0], cs.full_borrowing_ci[0], env.lower) - 0.2;
+      const hi = Math.max(cs.vague_ci[1], cs.full_borrowing_ci[1], env.upper) + 0.2;
+      for (let i = 0; i <= 200; i++) xs.push(lo + (hi - lo) * i / 200);
+      const normPdf = (x, mu, sd) =>
+        Math.exp(-0.5 * ((x - mu) / sd) ** 2) / (sd * Math.sqrt(2 * Math.PI));
+      const target_se = (cs.vague_ci[1] - cs.vague_ci[0]) / (2 * 1.96);
+      const target_mu = (cs.vague_ci[0] + cs.vague_ci[1]) / 2;
+      const full_se = (cs.full_borrowing_ci[1] - cs.full_borrowing_ci[0]) / (2 * 1.96);
+      const full_mu = (cs.full_borrowing_ci[0] + cs.full_borrowing_ci[1]) / 2;
+      const traces = [
+        { x: xs, y: xs.map(x => normPdf(x, target_mu, target_se)),
+          name: 'Vague (target alone)', mode: 'lines', line: { color: '#888' } },
+        { x: xs, y: xs.map(x => normPdf(x, full_mu, full_se)),
+          name: 'Full borrowing', mode: 'lines', line: { color: '#06c' } },
+        { x: [env.lower, env.upper], y: [0, 0],
+          name: 'Envelope', mode: 'lines+markers',
+          line: { color: '#000', width: 4 }, marker: { size: 10 } },
+        { x: [env.point], y: [0], name: 'Robust point',
+          mode: 'markers', marker: { size: 14, color: '#c00', symbol: 'diamond' } },
+      ];
+      Plotly.newPlot('k1-viz', traces, {
+        margin: { t: 20, b: 40 }, height: 360,
+        xaxis: { title: 'Effect (log scale)' }, yaxis: { title: 'Density' },
+      }, { displayModeBar: false });
     }
 
     document.getElementById('k1-run').addEventListener('click', k1Run);
