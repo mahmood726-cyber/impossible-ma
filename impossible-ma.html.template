@@ -620,6 +620,64 @@ json.dumps(asdict(env), default=float)
       for (let i = 0; i < 3; i++) advAddRow();
     });
 
+    async function advRun() {
+      const errBox = document.getElementById('adv-error');
+      const result = document.getElementById('adv-result');
+      errBox.hidden = true; result.hidden = true;
+      if (!window.PYODIDE_READY) {
+        errBox.textContent = 'Engine not ready yet.'; errBox.hidden = false; return;
+      }
+      const studies = advReadStudies();
+      try {
+        window.PYODIDE.globals.set('ADV_STUDIES', window.PYODIDE.toPy(studies));
+        const result_json = await window.PYODIDE.runPythonAsync(`
+import json
+import pandas as pd
+from impossible_ma.adversarial import adversarial_envelope
+from dataclasses import asdict
+df = pd.DataFrame(ADV_STUDIES.to_py())
+env = adversarial_envelope(df)
+json.dumps(asdict(env), default=float)
+        `);
+        const env = JSON.parse(result_json);
+        document.getElementById('adv-json').textContent = JSON.stringify(env, null, 2);
+        window.ADV_LAST_ENVELOPE = env;
+        document.getElementById('adv-result').hidden = false;
+        advRender(env);
+      } catch (err) {
+        errBox.textContent = 'Error: ' + (err.message || String(err));
+        errBox.hidden = false;
+      }
+    }
+
+    function advRender(env) {
+      const audit = env.case_specific.audit_trail || [];
+      const estimates = audit.map(p => p.estimate);
+      const full = env.case_specific.full_data_reml.estimate;
+      const traces = [
+        { x: estimates, type: 'histogram', name: 'Pool estimates',
+          marker: { color: '#06c' }, opacity: 0.7, nbinsx: 40 },
+        { x: [env.lower, env.lower], y: [0, 1], yref: 'paper',
+          mode: 'lines', name: 'Envelope lower',
+          line: { color: '#c00', width: 2 } },
+        { x: [env.upper, env.upper], y: [0, 1], yref: 'paper',
+          mode: 'lines', name: 'Envelope upper',
+          line: { color: '#c00', width: 2 } },
+        { x: [full, full], y: [0, 1], yref: 'paper',
+          mode: 'lines', name: 'Full-data REML',
+          line: { color: '#000', width: 2, dash: 'dash' } },
+      ];
+      const layout = {
+        margin: { t: 60, b: 50 }, height: 420,
+        title: `${env.case_specific.n_pools} pools | lower rule: ${env.case_specific.lower_rule}<br>upper rule: ${env.case_specific.upper_rule}`,
+        xaxis: { title: 'Pooled estimate (log scale)' },
+        yaxis: { title: 'Pool count' },
+      };
+      Plotly.newPlot('adv-viz', traces, layout, { displayModeBar: false });
+    }
+
+    document.getElementById('adv-run').addEventListener('click', advRun);
+
     bootstrap();
   </script>
 </body>
