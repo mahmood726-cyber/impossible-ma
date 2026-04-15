@@ -129,3 +129,17 @@ def test_adversarial_envelope_exports_rule_tuples_for_extremes():
     assert "lower_rule" in env.case_specific
     assert "upper_rule" in env.case_specific
     assert isinstance(env.case_specific["lower_rule"], str)
+
+
+def test_adversarial_regression():
+    b = json.loads((FIXTURES / "adversarial_baseline.json").read_text())
+    df = pd.DataFrame(b["studies"])
+    env = adversarial_envelope(df)
+    assert abs(env.lower - b["lower"]) < 1e-6
+    assert abs(env.upper - b["upper"]) < 1e-6
+    assert env.case_specific["n_pools"] == b["n_pools"]
+    assert env.case_specific["no_significant_pool"] == b["no_significant_pool"]
+    assert (
+        abs(env.case_specific["full_data_reml"]["estimate"] - b["full_data_reml"]["estimate"])
+        < 1e-6
+    )
