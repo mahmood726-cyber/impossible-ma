@@ -678,6 +678,40 @@ json.dumps(asdict(env), default=float)
 
     document.getElementById('adv-run').addEventListener('click', advRun);
 
+    // ---- TruthCert sign-and-download ----
+    async function signAndDownload(envelope, caseName) {
+      const key = (document.getElementById('truthcert-key').value || '').trim();
+      if (key.length < 32) {
+        alert('Set a TruthCert key (32+ chars) in the footer first.');
+        return;
+      }
+      if (!window.PYODIDE_READY) {
+        alert('Engine not ready yet.'); return;
+      }
+      window.PYODIDE.globals.set('SIG_PAYLOAD', window.PYODIDE.toPy(envelope));
+      window.PYODIDE.globals.set('SIG_KEY', key);
+      const bundle_json = await window.PYODIDE.runPythonAsync(`
+import json, os
+os.environ['TRUTHCERT_HMAC_KEY'] = SIG_KEY
+from impossible_ma.truthcert import sign_bundle
+bundle = sign_bundle(SIG_PAYLOAD.to_py())
+json.dumps(bundle, default=float)
+      `);
+      const blob = new Blob([bundle_json], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `impossibleMA_${caseName}_${Date.now()}.json`;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(a.href);
+    }
+
+    document.getElementById('k1-export-json').addEventListener('click',
+      () => signAndDownload(window.K1_LAST_ENVELOPE, 'k1'));
+    document.getElementById('ms-export-json').addEventListener('click',
+      () => signAndDownload(window.MS_LAST_ENVELOPE, 'missing_se'));
+    document.getElementById('adv-export-json').addEventListener('click',
+      () => signAndDownload(window.ADV_LAST_ENVELOPE, 'adversarial'));
+
     bootstrap();
   </script>
 </body>
