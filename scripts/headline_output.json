@@ -3,9 +3,11 @@
   "n_rows_total": 68519,
   "n_ma_total": 6229,
   "denominator_critical": 444,
-  "numerator_by_case": {},
-  "numerator_total": 0,
-  "unclassified_count": 444,
+  "numerator_by_case": {
+    "adversarial": 444
+  },
+  "numerator_total": 444,
+  "unclassified_count": 0,
   "critical_module_frequency": {
     "prediction_gap": 444
   },

@@ -19,11 +19,16 @@ def critical_modules(df: pd.DataFrame, ma_id: str) -> set[str]:
 def classify_ma(df: pd.DataFrame, ma_id: str, k_studies: int) -> Case | None:
     """Apply the severity-priority rules. Returns None if no critical flag maps to a case."""
     crit = critical_modules(df, ma_id)
-    # Priority order: integrity -> underpowered(k<=T) -> fragility -> excess_sig -> underpowered(k>T)
+    # Priority order:
+    # integrity -> underpowered(k<=T) -> prediction_gap -> fragility -> excess_sig -> underpowered(k>T)
+    # prediction_gap added 2026-04-15 after headline run showed it is the only
+    # module that ever escalates to CRITICAL in the current MetaAudit corpus.
     if "integrity" in crit:
         return "missing_se"
     if "underpowered" in crit and k_studies <= K_UNDERPOWERED_THRESHOLD:
         return "k1"
+    if "prediction_gap" in crit:
+        return "adversarial"
     if "fragility" in crit:
         return "adversarial"
     if "excess_sig" in crit:

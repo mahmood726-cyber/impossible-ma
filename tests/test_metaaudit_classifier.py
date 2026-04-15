@@ -35,6 +35,17 @@ def test_classify_ma_fragility_is_adversarial():
     df = pd.DataFrame([_row("M4", "fragility", "CRITICAL")])
     assert classify_ma(df, "M4", k_studies=6) == "adversarial"
 
+def test_classify_ma_prediction_gap_is_adversarial():
+    df = pd.DataFrame([_row("M4b", "prediction_gap", "CRITICAL")])
+    assert classify_ma(df, "M4b", k_studies=7) == "adversarial"
+
+def test_classify_ma_prediction_gap_after_integrity_still_missing_se():
+    df = pd.DataFrame([
+        _row("M4c", "integrity", "CRITICAL"),
+        _row("M4c", "prediction_gap", "CRITICAL"),
+    ])
+    assert classify_ma(df, "M4c", k_studies=6) == "missing_se"
+
 def test_classify_ma_excess_sig_is_adversarial():
     df = pd.DataFrame([_row("M5", "excess_sig", "CRITICAL")])
     assert classify_ma(df, "M5", k_studies=10) == "adversarial"
