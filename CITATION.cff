@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "ImpossibleMA: bounded synthesis for meta-analyses declared unpoolable"
+version: "0.1.0"
+date-released: "2026-04-16"
+authors:
+  - family-names: "{{AUTHOR_1_FAMILY_NAME}}"
+    given-names: "{{AUTHOR_1_GIVEN_NAMES}}"
+    orcid: "https://orcid.org/{{AUTHOR_1_ORCID}}"
+    affiliation: "{{AUTHOR_1_AFFILIATION}}"
+repository-code: "https://github.com/mahmood726-cyber/impossible-ma"
+license: MIT
