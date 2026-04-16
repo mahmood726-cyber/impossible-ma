@@ -20,7 +20,9 @@ ROOT = Path(__file__).resolve().parents[1]
 HTML = ROOT / "impossible-ma.html"
 PORT = 8765
 PAGE_URL = f"http://localhost:{PORT}/impossible-ma.html"
-PAGE_READY_TIMEOUT = 240
+# Cold Pyodide load observed 170s-300s depending on host network + WASM compile
+# speed. Env override lets fast CI machines shorten the wait if needed.
+PAGE_READY_TIMEOUT = int(os.environ.get("PAGE_READY_TIMEOUT", "450"))
 
 
 @pytest.fixture(scope="module")
