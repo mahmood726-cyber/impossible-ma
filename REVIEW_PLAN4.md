@@ -61,10 +61,14 @@ None of this is caused by Plan 4. Per spec §3 and Task 0 Step 5, we did NOT app
 
 ## Other deferred follow-ups
 
-1. Replace `{{AUTHOR_*}}` placeholders in `LICENSE`, `CITATION.cff`, and `paper/AUTHORS.md` before formal publication.
-2. Synthesis submission for the three papers; Synthesis mints the DOI; find-replace `ZENODO_DOI_PENDING` across `paper/refs.bib` and `paper/f1000.md` once assigned.
-3. Optional: `index.html` symlink/copy at repo root so the Pages URL resolves without the `/impossible-ma.html` suffix.
-4. v0.1.1: figure-extraction route for missing_se, auto-MeSH for kone.
+1. ✅ **Done 2026-04-18 (commit `bb1828d`)**: replaced `{{AUTHOR_*}}` placeholders in `LICENSE`, `CITATION.cff`, `paper/AUTHORS.md` with Mahmood Ahmad author block (Royal Free, ORCID 0009-0003-7781-4478). Funding "none". COI: editorial-board disclosure for Synthēsis submission.
+2. **In progress — awaits user action**: submit the three papers. DOI policy updated 2026-04-18 — **Crossref**, not Zenodo (journals register via Crossref at publication). All `ZENODO_DOI_PENDING` scrubbed (`paper/refs.bib` x5, `paper/f1000.md` x2, `paper/AUTHORS.md` x1); replaced with Crossref notes.
+3. ✅ **Done 2026-04-18 (commit `637a3f3`)**: `index.html` meta-refresh redirect at repo root. Pages verified live — <https://mahmood726-cyber.github.io/impossible-ma/> returns 200 and redirects to `impossible-ma.html`. Open Graph tags included for unfurls.
+4. **Deferred — needs its own plan**: v0.1.1 figure-extraction route for missing_se + auto-MeSH for kone.
+
+## Registry reconciliation (deferred §Deferred at write time — now resolved)
+
+Re-ran `python C:\ProjectIndex\reconcile_counts.py` on 2026-04-18 — returns `[RESULT] OK`, exit 0. 0 missing paths, 0 broken shells, no stale text claims, no workbook denominator drift. The `wb-data-lakehouse` / `who-data-lakehouse` paths noted at Plan 4 write-time no longer fail the reconciler. INDEX.md entry for ImpossibleMA present at `C:\ProjectIndex\INDEX.md:1069` (DOI line corrected to Crossref on 2026-04-18).
 
 ## Combined project stats (Plans 1–4)
 
