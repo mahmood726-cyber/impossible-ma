@@ -1,8 +1,8 @@
-# Plan 4 Review — ImpossibleMA Ship (partial)
+# Plan 4 Review — ImpossibleMA Ship
 
 ## Summary
 
-ImpossibleMA shipped publicly as of 2026-04-16. GitHub repo public, Pages live, v0.1.0 release published. **INDEX.md append (Task 5) deferred** due to pre-existing systemic registry drift that must be resolved in a dedicated session. Public artefacts are complete and unblock paper submissions; registry catches up later.
+ImpossibleMA shipped publicly 2026-04-16. GitHub repo public, Pages live, v0.1.0 release published. Cleanup follow-ups closed 2026-04-18: author placeholders filled, Zenodo refs replaced with Crossref policy, `index.html` redirect live at Pages root, INDEX.md entry present and DOI line corrected, registry reconciler now green. Remaining open items: user-side paper submissions (x3) and v0.1.1 feature work.
 
 ## Public URLs (all live)
 
