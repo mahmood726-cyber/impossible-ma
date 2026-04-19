@@ -166,16 +166,29 @@ class TestDecode:
             _decode_and_validate_image(_png_bytes(400, 50))
 
     def test_too_large_rejected(self):
-        # Build a noisy image to defeat compression and force >10 MB
-        rng = np.random.default_rng(0)
-        noise = rng.integers(0, 256, size=(3000, 3000), dtype=np.uint8)
+        # Size gate fires before any Pillow decoding. Using raw bytes makes the
+        # test deterministic regardless of PNG compression behaviour — the whole
+        # point of the size-first ordering is that we don't spend memory
+        # decoding oversized payloads, so this also validates the ordering.
+        with pytest.raises(ImageTooLargeError, match="10 MB"):
+            _decode_and_validate_image(b"\x00" * 10_000_001)
+
+    def test_decompression_bomb_rejected(self):
+        """A small PNG declaring very large dimensions should map to
+        ImageTooLargeError (not leak as PIL.Image.DecompressionBombError).
+        15000×15000 solid-L PNG is ~250 KB encoded but 225 MP decoded,
+        well past Pillow's default 89 MP bomb threshold."""
         buf = io.BytesIO()
-        Image.fromarray(noise, "L").save(buf, format="PNG", compress_level=0)
-        raw = buf.getvalue()
-        if len(raw) > 10_000_000:
-            with pytest.raises(ImageTooLargeError, match="10 MB"):
-                _decode_and_validate_image(raw)
-        else:
-            pytest.skip(
-                f"test image was {len(raw)} bytes — couldn't exceed 10 MB"
-            )
+        Image.new("L", (15000, 15000), 255).save(buf, format="PNG")
+        with pytest.raises(ImageTooLargeError):
+            _decode_and_validate_image(buf.getvalue())
+
+    def test_truncated_image_rejected(self):
+        """A truncated PNG passes Image.open() (lazy) but fails on convert().
+        Must be translated to UnsupportedFigureFormatError."""
+        full = _png_bytes(400, 300)
+        # Take enough bytes to keep the PNG header valid (Image.open succeeds)
+        # but not enough for the IDAT chunk to decode (convert("L") fails).
+        truncated = full[: len(full) // 2]
+        with pytest.raises(UnsupportedFigureFormatError, match="truncated|decode"):
+            _decode_and_validate_image(truncated)

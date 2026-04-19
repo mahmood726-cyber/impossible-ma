@@ -38,6 +38,11 @@ def _decode_and_validate_image(image_bytes: bytes) -> np.ndarray:
         raise UnsupportedFigureFormatError(
             "could not decode image; only PNG or JPG is supported"
         ) from e
+    except Image.DecompressionBombError as e:
+        raise ImageTooLargeError(
+            "figure dimensions exceed Pillow's decompression bomb threshold; "
+            "scale down to a reasonable resolution before uploading"
+        ) from e
     if fmt not in ("PNG", "JPEG"):
         raise UnsupportedFigureFormatError(
             f"only PNG or JPG is supported; got {fmt or 'unknown'}"
@@ -47,7 +52,12 @@ def _decode_and_validate_image(image_bytes: bytes) -> np.ndarray:
         raise ImageTooSmallError(
             f"figure is too small ({w}x{h}); re-export at 800px or larger"
         )
-    return np.asarray(img.convert("L"), dtype=np.uint8)
+    try:
+        return np.asarray(img.convert("L"), dtype=np.uint8)
+    except OSError as e:
+        raise UnsupportedFigureFormatError(
+            "could not decode image; file appears truncated or corrupted"
+        ) from e
 
 
 def p_to_se(effect: float, p_value: float) -> float:
