@@ -5,8 +5,9 @@ Route B: CI bounds -> SE via z or t(df)
 Route C: test statistic -> SE; statistic treated as z by default, or t(df)
 Route D: figure extraction (v1.1; raises NotImplementedError)
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from statistics import median
+from typing import Literal
 
 from scipy import stats
 
@@ -101,6 +102,65 @@ class HandlesCrossedError(FigureExtractionError):
 
 class ConfidenceLevelInvalidError(FigureExtractionError):
     """conf_level must satisfy 0 < conf_level < 1."""
+
+
+# ---------- Route D dataclasses ----------
+
+@dataclass(frozen=True)
+class Calibration:
+    scale: Literal["log", "linear"]
+    ref_pixel_1: int
+    ref_value_1: float
+    ref_pixel_2: int
+    ref_value_2: float
+
+    def __post_init__(self):
+        if self.scale not in ("log", "linear"):
+            raise CalibrationError(
+                f"scale must be 'log' or 'linear', got {self.scale!r}"
+            )
+        if self.ref_pixel_1 == self.ref_pixel_2:
+            raise CalibrationError(
+                "calibration points must have distinct pixel x-positions"
+            )
+        if self.ref_value_1 == self.ref_value_2:
+            raise CalibrationError(
+                "calibration points must have distinct values"
+            )
+        if self.scale == "log":
+            if self.ref_value_1 <= 0 or self.ref_value_2 <= 0:
+                raise CalibrationError(
+                    f"log scale requires positive values, got "
+                    f"{self.ref_value_1} and {self.ref_value_2}"
+                )
+
+
+@dataclass(frozen=True)
+class RowClick:
+    click_y: int
+    lower_handle_x: int
+    upper_handle_x: int
+    label: str | None = None
+
+
+@dataclass(frozen=True)
+class RowExtraction:
+    effect: float
+    se: float
+    conf_level: float
+    scale: Literal["log", "linear"]
+    audit: dict[str, object] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class FigureExtractionBundle:
+    image_sha256: str
+    calibration: Calibration
+    rows: list[RowClick]
+    conf_level: float
+    results: list[RowExtraction]
+    engine_version: str
+    timestamp_iso: str
 
 
 @dataclass
