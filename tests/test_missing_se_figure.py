@@ -192,3 +192,68 @@ class TestDecode:
         truncated = full[: len(full) // 2]
         with pytest.raises(UnsupportedFigureFormatError, match="truncated|decode"):
             _decode_and_validate_image(truncated)
+
+
+from impossible_ma.missing_se import propose_whisker_caps
+
+
+def _synthetic_whisker_image(
+    width: int, height: int, row_y: int,
+    lower_x: int, upper_x: int,
+    marker_x: int | None = None,
+) -> bytes:
+    """Create a test image with two short vertical whisker caps and an
+    optional midpoint marker. Returns PNG bytes.
+    """
+    arr = np.full((height, width), 255, dtype=np.uint8)  # white background
+    # horizontal bar between whiskers (dark, thin)
+    arr[row_y, lower_x:upper_x + 1] = 0
+    # whisker caps: short vertical lines, ±3 px from row_y
+    arr[row_y - 3:row_y + 4, lower_x] = 0
+    arr[row_y - 3:row_y + 4, upper_x] = 0
+    # optional marker (small filled square)
+    if marker_x is not None:
+        arr[row_y - 2:row_y + 3, marker_x - 2:marker_x + 3] = 0
+    buf = io.BytesIO()
+    # Pillow auto-detects L mode from 2-D uint8; avoids mode= deprecation.
+    Image.fromarray(arr).save(buf, format="PNG")
+    return buf.getvalue()
+
+
+class TestProposeWhiskerCaps:
+    def test_detects_both_caps(self):
+        img = _synthetic_whisker_image(400, 200, row_y=100,
+                                       lower_x=120, upper_x=280,
+                                       marker_x=200)
+        lo, hi = propose_whisker_caps(img, click_y=100)
+        assert abs(lo - 120) <= 1
+        assert abs(hi - 280) <= 1
+
+    def test_click_y_out_of_bounds_raises(self):
+        img = _synthetic_whisker_image(400, 200, row_y=100,
+                                       lower_x=120, upper_x=280)
+        with pytest.raises(ClickYOutOfBoundsError):
+            propose_whisker_caps(img, click_y=-5)
+        with pytest.raises(ClickYOutOfBoundsError):
+            propose_whisker_caps(img, click_y=250)
+
+    def test_no_whiskers_raises(self):
+        # solid white image: no edges at all
+        buf = io.BytesIO()
+        Image.new("L", (400, 200), 255).save(buf, format="PNG")
+        with pytest.raises(NoWhiskerCapsDetectedError):
+            propose_whisker_caps(buf.getvalue(), click_y=100)
+
+    def test_too_close_raises(self):
+        img = _synthetic_whisker_image(400, 200, row_y=100,
+                                       lower_x=198, upper_x=202)
+        with pytest.raises(WhiskerCapsTooCloseError):
+            propose_whisker_caps(img, click_y=100)
+
+    def test_off_row_still_finds_if_in_band(self):
+        img = _synthetic_whisker_image(400, 200, row_y=100,
+                                       lower_x=120, upper_x=280)
+        # click_y 102 is within band_height=7 (centred on 100 → 97–103)
+        lo, hi = propose_whisker_caps(img, click_y=102)
+        assert abs(lo - 120) <= 1
+        assert abs(hi - 280) <= 1

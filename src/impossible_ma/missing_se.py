@@ -60,6 +60,91 @@ def _decode_and_validate_image(image_bytes: bytes) -> np.ndarray:
         ) from e
 
 
+_DEFAULT_BAND_HEIGHT = 7
+_MIN_CAP_SEPARATION = 10
+_THRESHOLD_MAD_MULTIPLIER = 3.0
+# Peak-collapse window: a single vertical cap produces centred-gradient peaks
+# 2 px apart (columns c-1 and c+1 around the cap at column c). Using
+# min_sep=3 collapses those intra-cap duplicates while preserving legitimately
+# close cap pairs so WhiskerCapsTooCloseError can fire on span < 10 px.
+_PEAK_MIN_SEPARATION = 3
+
+
+def _column_gradient_signal(band: np.ndarray) -> np.ndarray:
+    """Centred horizontal gradient summed over rows; normalised to [0, 1]."""
+    # Centred difference: |I[:, x+1] - I[:, x-1]|
+    grad = np.abs(
+        band[:, 2:].astype(np.int16) - band[:, :-2].astype(np.int16)
+    )  # shape: (band_h, W-2)
+    col_sum = grad.sum(axis=0)  # shape: (W-2,)
+    # Pad to original width with zeros at the first and last column
+    padded = np.zeros(band.shape[1], dtype=np.float64)
+    padded[1:-1] = col_sum
+    # Normalise: max possible per column = band_h * 255 * 2 = band_h * 510
+    return padded / (band.shape[0] * 510.0)
+
+
+def _find_peaks(
+    signal: np.ndarray, threshold: float, min_sep: int
+) -> list[int]:
+    """Return column indices of above-threshold peaks with min-separation
+    enforced greedily from left to right (retains the larger peak inside
+    any colliding cluster)."""
+    above = np.where(signal > threshold)[0]
+    if len(above) == 0:
+        return []
+    peaks: list[int] = []
+    for x in above:
+        if not peaks or (x - peaks[-1]) >= min_sep:
+            peaks.append(int(x))
+        else:
+            # Keep whichever is larger
+            if signal[x] > signal[peaks[-1]]:
+                peaks[-1] = int(x)
+    return peaks
+
+
+def propose_whisker_caps(
+    image_bytes: bytes,
+    click_y: int,
+    band_height: int = _DEFAULT_BAND_HEIGHT,
+) -> tuple[int, int]:
+    """Edge-detect proposed whisker-cap x-positions in a horizontal band
+    centred on click_y.
+
+    Returns (lower_x, upper_x) — leftmost and rightmost above-threshold peaks.
+    Raises ClickYOutOfBoundsError, NoWhiskerCapsDetectedError,
+    WhiskerCapsTooCloseError, and decoding errors.
+    """
+    arr = _decode_and_validate_image(image_bytes)
+    h, w = arr.shape
+    if click_y < 0 or click_y >= h:
+        raise ClickYOutOfBoundsError(
+            f"click_y={click_y} is outside image height {h}"
+        )
+    half = band_height // 2
+    y_lo = max(0, click_y - half)
+    y_hi = min(h, click_y + half + 1)
+    band = arr[y_lo:y_hi, :]
+    signal = _column_gradient_signal(band)
+    med = float(np.median(signal))
+    mad = float(np.median(np.abs(signal - med)))
+    threshold = med + _THRESHOLD_MAD_MULTIPLIER * mad
+    peaks = _find_peaks(signal, threshold, min_sep=_PEAK_MIN_SEPARATION)
+    if len(peaks) < 2:
+        raise NoWhiskerCapsDetectedError(
+            f"found {len(peaks)} peak(s) above threshold {threshold:.4f} "
+            f"(median={med:.4f}, MAD={mad:.4f}); detection did not converge"
+        )
+    lo, hi = peaks[0], peaks[-1]
+    if hi - lo < _MIN_CAP_SEPARATION:
+        raise WhiskerCapsTooCloseError(
+            f"detected peaks span {hi - lo} px (< {_MIN_CAP_SEPARATION}); "
+            "likely false positive on a marker or noise"
+        )
+    return lo, hi
+
+
 def p_to_se(effect: float, p_value: float) -> float:
     if not (0.0 < p_value < 1.0):
         raise ValueError(f"p_value must be in (0, 1), got {p_value}")
