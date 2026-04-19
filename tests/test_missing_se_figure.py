@@ -1,4 +1,5 @@
 """Pytest suite for Route D (figure extraction) of missing_se."""
+import hashlib
 import json
 import pytest
 
@@ -593,3 +594,50 @@ def test_hypothesis_log_roundtrip(s):
 @settings(max_examples=50, deadline=2000, derandomize=True)
 def test_hypothesis_linear_roundtrip(s):
     _roundtrip_check(s)
+
+
+from impossible_ma.missing_se import build_figure_bundle
+from impossible_ma.truthcert import sign_bundle, verify_bundle
+
+
+def test_truthcert_round_trip():
+    fixture_stem = "log_narrow_sq_800_png"
+    truth = json.loads(
+        (FIXTURE_DIR / f"{fixture_stem}.truth.json").read_text("utf-8")
+    )
+    img = (FIXTURE_DIR / f"{fixture_stem}.png").read_bytes()
+    cal = Calibration(
+        scale=truth["scale"],
+        ref_pixel_1=truth["calibration_clicks"][0]["pixel_x"],
+        ref_value_1=truth["calibration_clicks"][0]["value"],
+        ref_pixel_2=truth["calibration_clicks"][1]["pixel_x"],
+        ref_value_2=truth["calibration_clicks"][1]["value"],
+    )
+    rows = [
+        RowClick(
+            click_y=s["click_y"],
+            lower_handle_x=s["lower_x_true"],
+            upper_handle_x=s["upper_x_true"],
+            label=s["label"],
+        )
+        for s in truth["studies"]
+    ]
+    bundle = build_figure_bundle(img, cal, rows, conf_level=0.95,
+                                 engine_version="0.1.1")
+    # Signed round-trip
+    from dataclasses import asdict
+    signed = sign_bundle({"bundle": _bundle_to_jsonable(bundle)})
+    verify_bundle(signed)  # raises on tamper
+    # Replay: same inputs -> same results (exact equality, not tolerance)
+    replay = extract_se_from_figure(img, cal, rows, conf_level=0.95)
+    assert replay == bundle.results
+    # Bundle has the expected top-level fields
+    assert bundle.image_sha256 == hashlib.sha256(img).hexdigest()
+    assert bundle.engine_version == "0.1.1"
+    assert len(bundle.timestamp_iso) == 20  # YYYY-MM-DDTHH:MM:SSZ
+
+
+def _bundle_to_jsonable(b) -> dict:
+    """Convert a dataclass (possibly nested) to a JSON-serialisable dict."""
+    from dataclasses import asdict
+    return asdict(b)

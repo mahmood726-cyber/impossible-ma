@@ -5,9 +5,11 @@ Route B: CI bounds -> SE via z or t(df)
 Route C: test statistic -> SE; statistic treated as z by default, or t(df)
 Route D: figure extraction (v1.1; raises NotImplementedError)
 """
+import hashlib
 import io
 import math
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from statistics import median
 from typing import Literal
 
@@ -490,6 +492,31 @@ def extract_se_from_figure(
             audit=audit,
         ))
     return results
+
+
+def build_figure_bundle(
+    image_bytes: bytes,
+    calibration: Calibration,
+    rows: list[RowClick],
+    conf_level: float = 0.95,
+    engine_version: str = "0.1.1",
+) -> FigureExtractionBundle:
+    """Convenience: compute results + package into a TruthCert-ready bundle.
+
+    The caller is responsible for feeding the bundle through
+    truthcert.sign_bundle (after asdict-serialisation) if signing is
+    desired.
+    """
+    results = extract_se_from_figure(image_bytes, calibration, rows, conf_level)
+    return FigureExtractionBundle(
+        image_sha256=hashlib.sha256(image_bytes).hexdigest(),
+        calibration=calibration,
+        rows=list(rows),
+        conf_level=conf_level,
+        results=results,
+        engine_version=engine_version,
+        timestamp_iso=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    )
 
 
 @dataclass
