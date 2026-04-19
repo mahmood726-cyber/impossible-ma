@@ -104,19 +104,45 @@ def _find_peaks(
     return peaks
 
 
+def _choose_bg_offsets(
+    click_y: int, h: int, band_height: int
+) -> list[int]:
+    """Return up to 3 reference-band y-offsets far from click_y for
+    background-gradient sampling. The offsets are spaced by ~1/4 of the
+    image height so they land between typical study rows (which are
+    evenly spaced on a forest plot). If the image is too short to fit
+    separated reference bands, returns fewer (may return empty list —
+    caller skips background subtraction)."""
+    min_sep = 3 * band_height  # at least 3× band-height away from click_y
+    candidates = [h // 4, h // 2, 3 * h // 4]
+    picks: list[int] = []
+    for c in candidates:
+        if abs(c - click_y) >= min_sep and 0 <= c < h:
+            # Avoid duplicates
+            if not any(abs(c - p) < band_height for p in picks):
+                picks.append(c)
+    return picks
+
+
 def propose_whisker_caps(
     image_bytes: bytes,
     click_y: int,
     band_height: int = _DEFAULT_BAND_HEIGHT,
+    search_x_range: tuple[int, int] | None = None,
 ) -> tuple[int, int]:
     """Propose whisker-cap x-positions in a horizontal band centred on
     click_y. The result is a proposal, not authoritative — users are
     expected to confirm or drag-correct the returned positions.
 
     Algorithm: centred horizontal gradient summed over a ``band_height``
-    band, thresholded at ``median + 3*MAD`` (floor ``_MIN_THRESHOLD_FLOOR``),
-    with near-neighbour peak collapse to suppress intra-edge gradient echoes.
-    Returns the leftmost and rightmost surviving peaks as (lower_x, upper_x).
+    band, minus a background gradient sampled at up to 3 reference bands
+    far from click_y (suppresses full-height vertical lines like
+    null-effect axvlines, axis spines, and gridlines; row-local whisker
+    caps survive because they produce no signal in the reference bands).
+    Thresholded at ``median + 3*MAD`` (floor ``_MIN_THRESHOLD_FLOOR``),
+    with near-neighbour peak collapse to suppress intra-edge gradient
+    echoes. Returns the leftmost and rightmost surviving peaks as
+    (lower_x, upper_x).
 
     Limitations
     -----------
@@ -128,6 +154,15 @@ def propose_whisker_caps(
     Similarly, anything drawn past the caps in the band y-range (annotation
     arrows, connector lines) will pollute the proposal.
 
+    Additionally, dashed vertical lines that span the plot height (e.g.
+    null-effect reference lines at HR=1 or SMD=0) are only partially
+    suppressed by background subtraction because the dash pattern varies
+    across y-bands. Expect to drag-correct on any row whose real cap
+    falls near such a reference line. v0.1.1 ships validated against a
+    corpus of clean horizontal forest plots without null lines —
+    production plots should still work for most rows, with the
+    user-in-the-loop drag-correct flow covering the rest.
+
     Parameters
     ----------
     image_bytes : bytes
@@ -137,11 +172,16 @@ def propose_whisker_caps(
         height.
     band_height : int, default 7
         Height in pixels of the horizontal band to scan. Must be >= 1.
+    search_x_range : tuple[int, int], optional
+        If given, restricts peak search to columns ``x_lo..x_hi`` inclusive.
+        Use the calibration bbox to exclude gutter features (y-axis tick
+        labels, margin text) that would otherwise win as leftmost/rightmost
+        peaks. Must satisfy ``0 <= x_lo < x_hi < width``.
 
     Raises
     ------
     ValueError
-        If band_height < 1.
+        If band_height < 1, or if search_x_range is invalid.
     ClickYOutOfBoundsError
         If click_y is outside the image.
     NoWhiskerCapsDetectedError
@@ -161,11 +201,51 @@ def propose_whisker_caps(
         raise ClickYOutOfBoundsError(
             f"click_y={click_y} is outside image height {h}"
         )
+    if search_x_range is not None:
+        x_lo, x_hi = search_x_range
+        if not (0 <= x_lo < x_hi < w):
+            raise ValueError(
+                f"search_x_range={search_x_range} invalid; must satisfy "
+                f"0 <= x_lo < x_hi < width ({w})"
+            )
     half = band_height // 2
     y_lo = max(0, click_y - half)
     y_hi = min(h, click_y + half + 1)
     band = arr[y_lo:y_hi, :]
     signal = _column_gradient_signal(band)
+
+    # Background subtraction: suppress vertical lines that span the full
+    # plot height (null-effect axvline, axis spines, gridlines). These
+    # produce equal signal at the clicked band AND at a reference band
+    # far from any whisker row; whisker caps only appear in their own
+    # row's band. We sample THREE reference bands at different y
+    # offsets to avoid picking a reference that happens to coincide
+    # with another study's whiskers, and take the MINIMUM of the three
+    # as the background estimate (so a real cap's reference-band
+    # signal is ~0, but an axvline's is ~the peak value).
+    bg_y_offsets = _choose_bg_offsets(click_y, h, band_height)
+    if bg_y_offsets:
+        bg_signals = []
+        for by in bg_y_offsets:
+            b_lo = max(0, by - half)
+            b_hi = min(h, by + half + 1)
+            bg_band = arr[b_lo:b_hi, :]
+            # Match row count to the click band so the normalisation is
+            # comparable (if the clicked band was clipped by the image
+            # edge). If the bg band has different row count, truncate
+            # it to match.
+            min_rows = min(bg_band.shape[0], band.shape[0])
+            bg_signals.append(_column_gradient_signal(bg_band[:min_rows, :]))
+        # Minimum across the 3 bg bands per column
+        bg = np.min(np.stack(bg_signals, axis=0), axis=0)
+        signal = np.maximum(signal - bg, 0.0)
+
+    # Mask columns outside the search range so gutter/margin gradients
+    # (tick labels, axis text) cannot win as leftmost/rightmost.
+    if search_x_range is not None:
+        signal[: search_x_range[0]] = 0.0
+        signal[search_x_range[1] + 1:] = 0.0
+
     med = float(np.median(signal))
     mad = float(np.median(np.abs(signal - med)))
     threshold = max(med + _THRESHOLD_MAD_MULTIPLIER * mad, _MIN_THRESHOLD_FLOOR)

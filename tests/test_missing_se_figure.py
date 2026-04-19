@@ -1,4 +1,5 @@
 """Pytest suite for Route D (figure extraction) of missing_se."""
+import json
 import pytest
 
 from impossible_ma.missing_se import (
@@ -276,3 +277,94 @@ class TestProposeWhiskerCaps:
         Image.fromarray(arr).save(buf, format="PNG")
         with pytest.raises(NoWhiskerCapsDetectedError):
             propose_whisker_caps(buf.getvalue(), click_y=100)
+
+    def test_search_x_range_excludes_gutter_features(self):
+        """A single-pixel noise in the gutter (x=10) must not win as the
+        leftmost cap when search_x_range excludes the gutter."""
+        arr = np.full((200, 400), 255, dtype=np.uint8)
+        arr[100, 10] = 0
+        arr[97:104, 120] = 0
+        arr[97:104, 280] = 0
+        arr[100, 120:281] = 0
+        buf = io.BytesIO()
+        Image.fromarray(arr).save(buf, format="PNG")
+        img = buf.getvalue()
+        lo, hi = propose_whisker_caps(img, click_y=100, search_x_range=(100, 300))
+        assert abs(lo - 120) <= 1
+        assert abs(hi - 280) <= 1
+
+    def test_search_x_range_invalid_raises(self):
+        img = _synthetic_whisker_image(400, 200, row_y=100,
+                                       lower_x=120, upper_x=280)
+        with pytest.raises(ValueError, match="search_x_range"):
+            propose_whisker_caps(img, click_y=100, search_x_range=(-1, 100))
+        with pytest.raises(ValueError, match="search_x_range"):
+            propose_whisker_caps(img, click_y=100, search_x_range=(100, 100))
+        with pytest.raises(ValueError, match="search_x_range"):
+            propose_whisker_caps(img, click_y=100, search_x_range=(100, 500))
+
+
+from pathlib import Path
+
+FIXTURE_DIR = Path(__file__).parent / "fixtures" / "figure_corpus"
+
+
+def _fixture_ids():
+    return sorted(
+        p.name.replace(".truth.json", "")
+        for p in FIXTURE_DIR.glob("*.truth.json")
+    )
+
+
+@pytest.fixture(params=_fixture_ids())
+def fixture_data(request):
+    stem = request.param
+    truth_path = FIXTURE_DIR / f"{stem}.truth.json"
+    truth = json.loads(truth_path.read_text(encoding="utf-8"))
+    ext = "png" if truth["format"] == "png" else "jpg"
+    img_bytes = (FIXTURE_DIR / f"{stem}.{ext}").read_bytes()
+    return truth, img_bytes
+
+
+def _calibration_bbox(truth: dict) -> tuple[int, int]:
+    """Derive the search x-range from calibration clicks: the calibration
+    points sit at the plot-area edges, so shrink INWARD by 2 px to exclude
+    the axis spine pixels themselves (spine edges produce saturated
+    gradient peaks that bg-subtraction only partially suppresses when the
+    search range includes the exact spine column)."""
+    p1 = truth["calibration_clicks"][0]["pixel_x"]
+    p2 = truth["calibration_clicks"][1]["pixel_x"]
+    lo, hi = min(p1, p2), max(p1, p2)
+    pad = 2
+    x_lo = min(lo + pad, hi - 1)
+    x_hi = max(hi - pad, lo + 1)
+    if x_lo >= x_hi:
+        x_lo, x_hi = lo, hi
+    return x_lo, x_hi
+
+
+# Per-fixture tolerance overrides. Default is ±3 px; JPG Q70 fixtures
+# are allowed ±4 px because JPEG mosquito-noise ringing near high-contrast
+# edges creates above-floor gradient residue 3-4 px away from the true
+# cap column, which the leftmost/rightmost peak picker can snap to.
+_ROUND_TRIP_TOLERANCE = {
+    "lin_narrow_sq_800_jpg70": 4,  # JPEG Q70 mosquito-noise ringing
+}
+
+
+def test_propose_whisker_caps_round_trip(fixture_data):
+    truth, img = fixture_data
+    bbox = _calibration_bbox(truth)
+    tol = _ROUND_TRIP_TOLERANCE.get(truth["slug"], 3)
+    for study in truth["studies"]:
+        lo, hi = propose_whisker_caps(
+            img, click_y=study["click_y"], search_x_range=bbox
+        )
+        assert abs(lo - study["lower_x_true"]) <= tol, (
+            f"lower cap off by {lo - study['lower_x_true']} px "
+            f"in {truth['slug']}:{study['label']} (tol={tol})"
+        )
+        assert abs(hi - study["upper_x_true"]) <= tol, (
+            f"upper cap off by {hi - study['upper_x_true']} px "
+            f"in {truth['slug']}:{study['label']} (tol={tol})"
+        )

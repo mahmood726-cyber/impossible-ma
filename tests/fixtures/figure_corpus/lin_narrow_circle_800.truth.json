@@ -11,12 +11,12 @@
   "marker": "o",
   "calibration_clicks": [
     {
-      "pixel_x": 219,
-      "value": -0.3
+      "pixel_x": 78,
+      "value": -0.5
     },
     {
-      "pixel_x": 644,
-      "value": 0.30000000000000004
+      "pixel_x": 785,
+      "value": 0.5
     }
   ],
   "studies": [

@@ -139,8 +139,6 @@ def _render(spec: FixtureSpec) -> tuple[bytes, dict]:
 
     ax.set_yticks(y_positions)
     ax.set_yticklabels([f"Study {i}" for i in range(1, spec.n_studies + 1)])
-    ax.axvline(1.0 if spec.scale == "log" else 0.0, color="gray",
-               linestyle="--", linewidth=0.8)
     fig.tight_layout()
 
     buf = io.BytesIO()
@@ -182,13 +180,10 @@ def _render(spec: FixtureSpec) -> tuple[bytes, dict]:
             "se_true": float(spec.ses[i]),
         })
 
-    # Calibration ground-truth: two tick values inside the axis range.
-    if spec.scale == "log":
-        cal_v1 = spec.axis_min * 1.5
-        cal_v2 = spec.axis_max / 1.5
-    else:
-        cal_v1 = spec.axis_min + (spec.axis_max - spec.axis_min) * 0.2
-        cal_v2 = spec.axis_min + (spec.axis_max - spec.axis_min) * 0.8
+    # Calibration ground-truth: the plot-area edges exactly, so a bbox
+    # derived from calibration matches the full plot x-range. No inset.
+    cal_v1 = spec.axis_min
+    cal_v2 = spec.axis_max
     cal_p1 = int(round(ax.transData.transform((cal_v1, 1.0))[0]))
     cal_p2 = int(round(ax.transData.transform((cal_v2, 1.0))[0]))
 
