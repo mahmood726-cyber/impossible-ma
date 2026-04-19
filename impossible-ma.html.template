@@ -811,6 +811,466 @@ ${bundle ? `<h2>TruthCert signature</h2><pre>${bundle.signature}</pre><p>Algorit
     document.getElementById('adv-export-report').addEventListener('click',
       () => printableReport(window.ADV_LAST_ENVELOPE, 'adversarial'));
 
+    /* =============================================================
+     * Route D — figure extraction (Tasks 14, 15, 16)
+     * ============================================================= */
+    const routeD = (() => {
+      let imageBytes = null;
+      let canvas = null, ctx = null;
+      let calibrationClicks = [];
+      let extractedRows = [];
+      let currentDraft = null;
+      let dragging = null;
+
+      function init() {
+        canvas = document.getElementById('route-d-canvas');
+        if (!canvas) return;
+        ctx = canvas.getContext('2d');
+
+        document.getElementById('route-d-file').addEventListener('change', onFile);
+        document.getElementById('route-d-cal-reset').addEventListener('click', resetCalibration);
+        document.getElementById('route-d-export-tsv').addEventListener('click', exportTsv);
+        document.getElementById('route-d-send-to-b').addEventListener('click', sendToB);
+        document.getElementById('route-d-sign-bundle').addEventListener('click', signBundle);
+
+        canvas.addEventListener('click', onCanvasClick);
+        canvas.addEventListener('mousedown', onMouseDown);
+        canvas.addEventListener('mousemove', onMouseMove);
+        canvas.addEventListener('mouseup', onMouseUp);
+
+        document.addEventListener('keydown', onKeydown);
+        document.addEventListener('click', onDelegatedClick);  // for per-row delete buttons
+      }
+
+      // ---------------------------------------------------------
+      // Calibration flow
+      // ---------------------------------------------------------
+      async function onFile(evt) {
+        const file = evt.target.files[0];
+        if (!file) return;
+        const buf = await file.arrayBuffer();
+        imageBytes = new Uint8Array(buf);
+        const img = new Image();
+        img.onload = () => {
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          ctx.drawImage(img, 0, 0);
+          status('Calibration: click two x-axis reference points.');
+        };
+        img.src = URL.createObjectURL(file);
+        calibrationClicks = [];
+        extractedRows = [];
+        currentDraft = null;
+        renderCalTable();
+        renderRowsTable();
+        document.getElementById('route-d-cal-reset').disabled = true;
+      }
+
+      function getCanvasCoords(evt) {
+        const rect = canvas.getBoundingClientRect();
+        const x = Math.round((evt.clientX - rect.left) * (canvas.width / rect.width));
+        const y = Math.round((evt.clientY - rect.top) * (canvas.height / rect.height));
+        return [x, y];
+      }
+
+      function onCanvasClick(evt) {
+        if (!imageBytes) return;
+        if (dragging) return;  // drag path — do not treat mouseup as click
+        const [x, y] = getCanvasCoords(evt);
+        if (calibrationClicks.length < 2) {
+          const v = prompt(`Typed value at pixel x=${x}:`, '');
+          if (v === null || v === '') return;
+          const value = Number(v);
+          if (!isFinite(value)) { status('Value must be a finite number.'); return; }
+          calibrationClicks.push({pixel_x: x, value});
+          drawCalibrationMarker(x, calibrationClicks.length === 1 ? '#06c' : '#c60');
+          renderCalTable();
+          if (calibrationClicks.length === 2) {
+            status('Calibration set. Click a study row to extract whisker caps.');
+            document.getElementById('route-d-cal-reset').disabled = false;
+          }
+          return;
+        }
+        // Calibration complete → row click (click_y first, evt_x second)
+        onRowClick(y, x);
+      }
+
+      function drawCalibrationMarker(x, color) {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height);
+        ctx.stroke();
+      }
+
+      function resetCalibration() {
+        calibrationClicks = [];
+        extractedRows = [];
+        currentDraft = null;
+        renderCalTable();
+        renderRowsTable();
+        redraw();
+        status('Calibration cleared. Click two x-axis points to re-calibrate.');
+        document.getElementById('route-d-cal-reset').disabled = true;
+      }
+
+      function redraw() {
+        if (!imageBytes) return;
+        const blob = new Blob([imageBytes], {type: 'image/png'});
+        const url = URL.createObjectURL(blob);
+        const img = new Image();
+        img.onload = () => {
+          ctx.drawImage(img, 0, 0);
+          URL.revokeObjectURL(url);
+          // Redraw calibration markers
+          calibrationClicks.forEach((c, i) =>
+            drawCalibrationMarker(c.pixel_x, i === 0 ? '#06c' : '#c60')
+          );
+          // Redraw current draft bar + handles if any
+          if (currentDraft) drawDraftBar();
+        };
+        img.src = url;
+      }
+
+      function renderCalTable() {
+        const body = document.getElementById('route-d-cal-body');
+        body.innerHTML = calibrationClicks.map((c, i) =>
+          `<tr><td style="padding:0.2em 0.8em;">${i+1}</td>`
+          + `<td style="padding:0.2em 0.8em;">${c.pixel_x}</td>`
+          + `<td style="padding:0.2em 0.8em;">${c.value}</td></tr>`
+        ).join('');
+      }
+
+      function renderRowsTable() {
+        const body = document.getElementById('route-d-rows-body');
+        body.innerHTML = extractedRows.map((r, i) =>
+          `<tr>`
+          + `<td style="padding:0.2em 0.8em;">${escapeHtml(r.label || '')}</td>`
+          + `<td style="padding:0.2em 0.8em; text-align:right;">${r.effect.toFixed(4)}</td>`
+          + `<td style="padding:0.2em 0.8em; text-align:right;">${r.se.toFixed(4)}</td>`
+          + `<td style="padding:0.2em 0.8em;">Δpx=${r.audit.pixel_delta ?? '-'} ${r.audit.manual_override ? 'manual' : 'auto'}</td>`
+          + `<td style="padding:0.2em 0.8em;"><button data-row-del="${i}">x</button></td>`
+          + `</tr>`
+        ).join('');
+        const anyRows = extractedRows.length > 0;
+        document.getElementById('route-d-export-tsv').disabled = !anyRows;
+        document.getElementById('route-d-send-to-b').disabled = !anyRows;
+        document.getElementById('route-d-sign-bundle').disabled = !anyRows;
+      }
+
+      function escapeHtml(s) {
+        return String(s)
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+      }
+
+      function onDelegatedClick(evt) {
+        const idx = evt.target?.dataset?.rowDel;
+        if (idx === undefined) return;
+        extractedRows.splice(Number(idx), 1);
+        renderRowsTable();
+        redraw();
+      }
+
+      // ---------------------------------------------------------
+      // Row click → propose_whisker_caps → draft handles
+      // ---------------------------------------------------------
+      async function onRowClick(click_y, evt_x) {
+        if (!window.PYODIDE) {
+          status('Pyodide not ready yet — wait a moment and try again.');
+          return;
+        }
+        status(`Detecting whisker caps at y=${click_y}…`);
+        // Build calibration-derived bbox for search_x_range
+        const calPxs = calibrationClicks.map(c => c.pixel_x).sort((a, b) => a - b);
+        const [bx_lo, bx_hi] = calPxs;
+        const pad = Math.round((bx_hi - bx_lo) * 0.02);
+        const x_lo = Math.max(0, bx_lo + pad);
+        const x_hi = Math.min(canvas.width - 1, bx_hi - pad);
+
+        const g = window.PYODIDE.globals;
+        g.set('image_bytes', window.PYODIDE.toPy(imageBytes));
+        g.set('click_y', click_y);
+        g.set('x_lo', x_lo);
+        g.set('x_hi', x_hi);
+        const pyCode = `
+from impossible_ma.missing_se import propose_whisker_caps, NoWhiskerCapsDetectedError, WhiskerCapsTooCloseError
+import json
+try:
+    lo, hi = propose_whisker_caps(bytes(image_bytes), int(click_y), search_x_range=(int(x_lo), int(x_hi)))
+    out = {'ok': True, 'lower_x': lo, 'upper_x': hi}
+except NoWhiskerCapsDetectedError as e:
+    out = {'ok': False, 'err': 'no_caps', 'msg': str(e)}
+except WhiskerCapsTooCloseError as e:
+    out = {'ok': False, 'err': 'too_close', 'msg': str(e)}
+except Exception as e:
+    out = {'ok': False, 'err': 'other', 'msg': f'{type(e).__name__}: {e}'}
+json.dumps(out)
+`;
+        try {
+          const raw = window.PYODIDE.runPython(pyCode);
+          const res = JSON.parse(raw);
+          if (!res.ok) {
+            status(`Detection failed (${res.err}): ${res.msg}. Drag handles from centre.`);
+            const cx = Math.round((x_lo + x_hi) / 2);
+            currentDraft = {
+              click_y, lower_x: Math.max(x_lo, cx - 40),
+              upper_x: Math.min(x_hi, cx + 40),
+              manual_override: true,
+            };
+          } else {
+            currentDraft = {click_y, lower_x: res.lower_x, upper_x: res.upper_x,
+                            manual_override: false};
+            status('Whiskers proposed. Drag handles to correct or press Enter to confirm.');
+          }
+          redraw();
+          computeLiveSE();
+        } catch (e) {
+          status(`Error: ${e.message}`);
+        }
+      }
+
+      function drawDraftBar() {
+        if (!currentDraft) return;
+        ctx.strokeStyle = '#0a0';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(currentDraft.lower_x, currentDraft.click_y);
+        ctx.lineTo(currentDraft.upper_x, currentDraft.click_y);
+        ctx.stroke();
+        [currentDraft.lower_x, currentDraft.upper_x].forEach(x => {
+          ctx.beginPath();
+          ctx.moveTo(x, currentDraft.click_y - 8);
+          ctx.lineTo(x, currentDraft.click_y + 8);
+          ctx.stroke();
+          ctx.fillStyle = '#0a0';
+          ctx.fillRect(x - 3, currentDraft.click_y - 3, 6, 6);
+        });
+      }
+
+      function onMouseDown(evt) {
+        if (!currentDraft) return;
+        const [x, _y] = getCanvasCoords(evt);
+        if (Math.abs(x - currentDraft.lower_x) < 10) dragging = 'lower_x';
+        else if (Math.abs(x - currentDraft.upper_x) < 10) dragging = 'upper_x';
+      }
+
+      function onMouseMove(evt) {
+        if (!dragging || !currentDraft) return;
+        const [x, _y] = getCanvasCoords(evt);
+        currentDraft[dragging] = Math.max(0, Math.min(canvas.width - 1, x));
+        redraw();
+        computeLiveSE();
+      }
+
+      function onMouseUp() {
+        if (dragging) {
+          // Defer clearing so the subsequent click event doesn't re-trigger onRowClick
+          setTimeout(() => { dragging = null; }, 0);
+        }
+      }
+
+      // ---------------------------------------------------------
+      // Live SE preview via extract_se_from_figure
+      // ---------------------------------------------------------
+      function computeLiveSE() {
+        if (!currentDraft || calibrationClicks.length < 2 || !window.PYODIDE) return;
+        const scale = document.getElementById('route-d-scale').value;
+        const conf = Number(document.getElementById('route-d-conf').value) || 0.95;
+        const g = window.PYODIDE.globals;
+        g.set('image_bytes', window.PYODIDE.toPy(imageBytes));
+        g.set('scale', scale);
+        g.set('cal1_px', calibrationClicks[0].pixel_x);
+        g.set('cal1_v', calibrationClicks[0].value);
+        g.set('cal2_px', calibrationClicks[1].pixel_x);
+        g.set('cal2_v', calibrationClicks[1].value);
+        g.set('click_y', currentDraft.click_y);
+        g.set('lo', currentDraft.lower_x);
+        g.set('hi', currentDraft.upper_x);
+        g.set('conf', conf);
+        const pyCode = `
+import json
+from impossible_ma.missing_se import (
+    Calibration, RowClick, extract_se_from_figure,
+    CalibrationError, HandlesCrossedError, ConfidenceLevelInvalidError,
+)
+try:
+    cal = Calibration(
+        scale=scale,
+        ref_pixel_1=int(cal1_px), ref_value_1=float(cal1_v),
+        ref_pixel_2=int(cal2_px), ref_value_2=float(cal2_v),
+    )
+    rc = RowClick(click_y=int(click_y), lower_handle_x=int(lo), upper_handle_x=int(hi))
+    out = extract_se_from_figure(bytes(image_bytes), cal, [rc], conf_level=float(conf))
+    r = out[0]
+    result = {'ok': True, 'effect': r.effect, 'se': r.se, 'audit': r.audit, 'scale': r.scale}
+except (CalibrationError, HandlesCrossedError, ConfidenceLevelInvalidError) as e:
+    result = {'ok': False, 'msg': str(e)}
+except Exception as e:
+    result = {'ok': False, 'msg': f'{type(e).__name__}: {e}'}
+json.dumps(result)
+`;
+        try {
+          const raw = window.PYODIDE.runPython(pyCode);
+          const res = JSON.parse(raw);
+          if (res.ok) {
+            status(`Live: effect=${res.effect.toFixed(4)}  SE=${res.se.toFixed(4)}  —  Enter to confirm, Esc to cancel.`);
+            currentDraft.preview = res;
+          } else {
+            status(`Preview error: ${res.msg}`);
+          }
+        } catch (e) {
+          status(`Preview error: ${e.message}`);
+        }
+      }
+
+      // ---------------------------------------------------------
+      // Keyboard confirm/cancel
+      // ---------------------------------------------------------
+      function onKeydown(evt) {
+        if (!currentDraft) return;
+        // Ignore keydowns inside form inputs (label prompt, scale select, etc.)
+        const tag = evt.target?.tagName;
+        if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+        if (evt.key === 'Enter' && currentDraft.preview) {
+          const label = prompt('Row label (optional):', '') || `Row ${extractedRows.length + 1}`;
+          extractedRows.push({
+            label,
+            click_y: currentDraft.click_y,
+            lower_handle_x: currentDraft.lower_x,
+            upper_handle_x: currentDraft.upper_x,
+            effect: currentDraft.preview.effect,
+            se: currentDraft.preview.se,
+            scale: currentDraft.preview.scale,
+            audit: {...currentDraft.preview.audit, manual_override: currentDraft.manual_override},
+          });
+          currentDraft = null;
+          renderRowsTable();
+          redraw();
+          status(`Row added (${extractedRows.length} total). Click another row or use the export buttons.`);
+        } else if (evt.key === 'Escape') {
+          currentDraft = null;
+          redraw();
+          status('Draft cancelled.');
+        }
+      }
+
+      // ---------------------------------------------------------
+      // Exports
+      // ---------------------------------------------------------
+      function exportTsv() {
+        const scale = document.getElementById('route-d-scale').value;
+        const conf = Number(document.getElementById('route-d-conf').value) || 0.95;
+        const lines = ['label\teffect\tse\tscale\tconf'];
+        for (const r of extractedRows) {
+          lines.push(`${r.label}\t${r.effect}\t${r.se}\t${scale}\t${conf}`);
+        }
+        const blob = new Blob([lines.join('\n')], {type: 'text/tab-separated-values'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'route-d-extraction.tsv';
+        document.body.appendChild(a); a.click();
+        document.body.removeChild(a); URL.revokeObjectURL(url);
+      }
+
+      function sendToB() {
+        // Project's Route B inputs are ms-effect / ms-ci-lo / ms-ci-hi (single-row).
+        // If multiple rows are extracted, we populate the FIRST; the rest go via
+        // clipboard copy with a status message.
+        if (extractedRows.length === 0) return;
+        const first = extractedRows[0];
+        const z = first.audit.z_value || 1.959964;
+        const effectInput = document.getElementById('ms-effect');
+        const ciLoInput = document.getElementById('ms-ci-lo');
+        const ciHiInput = document.getElementById('ms-ci-hi');
+        if (!effectInput || !ciLoInput || !ciHiInput) {
+          status('Route B inputs not found (ms-effect/ms-ci-lo/ms-ci-hi). TSV export recommended instead.');
+          return;
+        }
+        effectInput.value = first.effect;
+        ciLoInput.value = first.effect - z * first.se;
+        ciHiInput.value = first.effect + z * first.se;
+        const more = extractedRows.length > 1
+          ? ` (${extractedRows.length - 1} additional rows in the extraction table — use TSV export for the full set)`
+          : '';
+        status(`Sent first row to Route B inputs${more}.`);
+      }
+
+      async function signBundle() {
+        if (!window.PYODIDE) { status('Pyodide not ready.'); return; }
+        status('Signing bundle…');
+        const g = window.PYODIDE.globals;
+        g.set('image_bytes', window.PYODIDE.toPy(imageBytes));
+        g.set('scale', document.getElementById('route-d-scale').value);
+        g.set('cal1_px', calibrationClicks[0].pixel_x);
+        g.set('cal1_v', calibrationClicks[0].value);
+        g.set('cal2_px', calibrationClicks[1].pixel_x);
+        g.set('cal2_v', calibrationClicks[1].value);
+        g.set('conf', Number(document.getElementById('route-d-conf').value) || 0.95);
+        g.set('engine_ver', '0.1.1');
+        g.set('row_list', window.PYODIDE.toPy(extractedRows));
+        const pyCode = `
+import json
+from dataclasses import asdict
+from impossible_ma.missing_se import Calibration, RowClick, build_figure_bundle
+from impossible_ma.truthcert import sign_bundle, TruthCertError
+try:
+    cal = Calibration(
+        scale=scale,
+        ref_pixel_1=int(cal1_px), ref_value_1=float(cal1_v),
+        ref_pixel_2=int(cal2_px), ref_value_2=float(cal2_v),
+    )
+    rows = [RowClick(click_y=int(r['click_y']),
+                     lower_handle_x=int(r['lower_handle_x']),
+                     upper_handle_x=int(r['upper_handle_x']),
+                     label=r.get('label')) for r in row_list.to_py()]
+    bundle = build_figure_bundle(bytes(image_bytes), cal, rows,
+                                 conf_level=float(conf),
+                                 engine_version=str(engine_ver))
+    signed = sign_bundle({'bundle': json.loads(json.dumps(asdict(bundle), default=float))})
+    out = {'ok': True, 'signed': signed}
+except TruthCertError as e:
+    out = {'ok': False, 'msg': f'TruthCert key missing: {e}'}
+except Exception as e:
+    out = {'ok': False, 'msg': f'{type(e).__name__}: {e}'}
+json.dumps(out)
+`;
+        try {
+          const raw = window.PYODIDE.runPython(pyCode);
+          const res = JSON.parse(raw);
+          if (!res.ok) {
+            status(`Sign failed: ${res.msg}`);
+            return;
+          }
+          const blob = new Blob([JSON.stringify(res.signed, null, 2)],
+                                {type: 'application/json'});
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url; a.download = 'route-d-bundle.signed.json';
+          document.body.appendChild(a); a.click();
+          document.body.removeChild(a); URL.revokeObjectURL(url);
+          status(`Bundle signed (${extractedRows.length} rows).`);
+        } catch (e) {
+          status(`Sign failed: ${e.message}`);
+        }
+      }
+
+      // ---------------------------------------------------------
+      // Misc
+      // ---------------------------------------------------------
+      function status(msg) {
+        const el = document.getElementById('route-d-status');
+        if (el) el.textContent = msg;
+      }
+
+      return {init};
+    })();
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', routeD.init);
+    } else {
+      routeD.init();
+    }
+
     bootstrap();
   </script>
 </body>
