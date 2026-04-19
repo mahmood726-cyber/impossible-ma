@@ -63,6 +63,7 @@ def _decode_and_validate_image(image_bytes: bytes) -> np.ndarray:
 _DEFAULT_BAND_HEIGHT = 7
 _MIN_CAP_SEPARATION = 10
 _THRESHOLD_MAD_MULTIPLIER = 3.0
+_MIN_THRESHOLD_FLOOR = 0.02
 # Peak-collapse window: a single vertical cap produces centred-gradient peaks
 # 2 px apart (columns c-1 and c+1 around the cap at column c). Using
 # min_sep=3 collapses those intra-cap duplicates while preserving legitimately
@@ -71,17 +72,16 @@ _PEAK_MIN_SEPARATION = 3
 
 
 def _column_gradient_signal(band: np.ndarray) -> np.ndarray:
-    """Centred horizontal gradient summed over rows; normalised to [0, 1]."""
-    # Centred difference: |I[:, x+1] - I[:, x-1]|
+    """Centred horizontal gradient |I[:, x+1] - I[:, x-1]| summed over rows,
+    normalised to [0, 1]. Vertical edges produce tall peaks; horizontal bars
+    have weak gradient along their length."""
     grad = np.abs(
         band[:, 2:].astype(np.int16) - band[:, :-2].astype(np.int16)
-    )  # shape: (band_h, W-2)
-    col_sum = grad.sum(axis=0)  # shape: (W-2,)
-    # Pad to original width with zeros at the first and last column
+    )  # shape: (band_h, W-2); per-row bound is 255 for uint8
+    col_sum = grad.sum(axis=0)  # shape: (W-2,); per-column bound is band_h * 255
     padded = np.zeros(band.shape[1], dtype=np.float64)
     padded[1:-1] = col_sum
-    # Normalise: max possible per column = band_h * 255 * 2 = band_h * 510
-    return padded / (band.shape[0] * 510.0)
+    return padded / (band.shape[0] * 255.0)
 
 
 def _find_peaks(
@@ -109,13 +109,52 @@ def propose_whisker_caps(
     click_y: int,
     band_height: int = _DEFAULT_BAND_HEIGHT,
 ) -> tuple[int, int]:
-    """Edge-detect proposed whisker-cap x-positions in a horizontal band
-    centred on click_y.
+    """Propose whisker-cap x-positions in a horizontal band centred on
+    click_y. The result is a proposal, not authoritative — users are
+    expected to confirm or drag-correct the returned positions.
 
-    Returns (lower_x, upper_x) — leftmost and rightmost above-threshold peaks.
-    Raises ClickYOutOfBoundsError, NoWhiskerCapsDetectedError,
-    WhiskerCapsTooCloseError, and decoding errors.
+    Algorithm: centred horizontal gradient summed over a ``band_height``
+    band, thresholded at ``median + 3*MAD`` (floor ``_MIN_THRESHOLD_FLOOR``),
+    with near-neighbour peak collapse to suppress intra-edge gradient echoes.
+    Returns the leftmost and rightmost surviving peaks as (lower_x, upper_x).
+
+    Limitations
+    -----------
+    The leftmost/rightmost policy assumes the whisker caps are the outermost
+    gradient features in the band. Random-effects summary diamonds commonly
+    extend further than per-study whisker caps, so **clicking on a summary
+    row will return the diamond's extent**, not the summary's
+    whisker-equivalent width. Recommend clicking on per-study rows only.
+    Similarly, anything drawn past the caps in the band y-range (annotation
+    arrows, connector lines) will pollute the proposal.
+
+    Parameters
+    ----------
+    image_bytes : bytes
+        PNG or JPG image bytes.
+    click_y : int
+        Pixel y-coordinate of the row to extract. Must be within image
+        height.
+    band_height : int, default 7
+        Height in pixels of the horizontal band to scan. Must be >= 1.
+
+    Raises
+    ------
+    ValueError
+        If band_height < 1.
+    ClickYOutOfBoundsError
+        If click_y is outside the image.
+    NoWhiskerCapsDetectedError
+        If fewer than 2 above-threshold peaks are found.
+    WhiskerCapsTooCloseError
+        If the surviving peaks span fewer than 10 pixels.
+    UnsupportedFigureFormatError, ImageTooSmallError, ImageTooLargeError
+        From the image-decode gate.
     """
+    if band_height < 1:
+        raise ValueError(
+            f"band_height must be >= 1, got {band_height}"
+        )
     arr = _decode_and_validate_image(image_bytes)
     h, w = arr.shape
     if click_y < 0 or click_y >= h:
@@ -129,7 +168,7 @@ def propose_whisker_caps(
     signal = _column_gradient_signal(band)
     med = float(np.median(signal))
     mad = float(np.median(np.abs(signal - med)))
-    threshold = med + _THRESHOLD_MAD_MULTIPLIER * mad
+    threshold = max(med + _THRESHOLD_MAD_MULTIPLIER * mad, _MIN_THRESHOLD_FLOOR)
     peaks = _find_peaks(signal, threshold, min_sep=_PEAK_MIN_SEPARATION)
     if len(peaks) < 2:
         raise NoWhiskerCapsDetectedError(

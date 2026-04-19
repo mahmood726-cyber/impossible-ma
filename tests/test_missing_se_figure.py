@@ -257,3 +257,22 @@ class TestProposeWhiskerCaps:
         lo, hi = propose_whisker_caps(img, click_y=102)
         assert abs(lo - 120) <= 1
         assert abs(hi - 280) <= 1
+
+    def test_band_height_zero_raises(self):
+        img = _synthetic_whisker_image(400, 200, row_y=100,
+                                       lower_x=120, upper_x=280)
+        with pytest.raises(ValueError, match="band_height"):
+            propose_whisker_caps(img, click_y=100, band_height=0)
+        with pytest.raises(ValueError, match="band_height"):
+            propose_whisker_caps(img, click_y=100, band_height=-1)
+
+    def test_sparse_noise_does_not_register_as_cap(self):
+        """Tiny-magnitude gradient features (grey 254 vs white 255) must not
+        register as caps once the MAD-floor is in place."""
+        arr = np.full((200, 400), 255, dtype=np.uint8)
+        arr[100, 50] = 254   # single-pixel noise, magnitude 1 after gradient
+        arr[100, 200] = 254  # second single-pixel noise
+        buf = io.BytesIO()
+        Image.fromarray(arr).save(buf, format="PNG")
+        with pytest.raises(NoWhiskerCapsDetectedError):
+            propose_whisker_caps(buf.getvalue(), click_y=100)
