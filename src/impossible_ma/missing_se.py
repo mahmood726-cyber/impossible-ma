@@ -5,13 +5,49 @@ Route B: CI bounds -> SE via z or t(df)
 Route C: test statistic -> SE; statistic treated as z by default, or t(df)
 Route D: figure extraction (v1.1; raises NotImplementedError)
 """
+import io
 from dataclasses import dataclass, field
 from statistics import median
 from typing import Literal
 
+import numpy as np
+from PIL import Image, UnidentifiedImageError
 from scipy import stats
 
 from .envelope import PossibilityEnvelope
+
+
+_MAX_IMAGE_BYTES = 10_000_000
+_MIN_IMAGE_DIM = 100
+
+
+def _decode_and_validate_image(image_bytes: bytes) -> np.ndarray:
+    """Decode PNG/JPG bytes → grayscale uint8 numpy array (shape H, W).
+
+    Raises ImageTooLargeError, UnsupportedFigureFormatError, ImageTooSmallError.
+    """
+    if len(image_bytes) > _MAX_IMAGE_BYTES:
+        raise ImageTooLargeError(
+            f"figure exceeds 10 MB ({len(image_bytes):,} bytes); "
+            "compress or scale down before uploading"
+        )
+    try:
+        img = Image.open(io.BytesIO(image_bytes))
+        fmt = (img.format or "").upper()
+    except UnidentifiedImageError as e:
+        raise UnsupportedFigureFormatError(
+            "could not decode image; only PNG or JPG is supported"
+        ) from e
+    if fmt not in ("PNG", "JPEG"):
+        raise UnsupportedFigureFormatError(
+            f"only PNG or JPG is supported; got {fmt or 'unknown'}"
+        )
+    w, h = img.size
+    if w < _MIN_IMAGE_DIM or h < _MIN_IMAGE_DIM:
+        raise ImageTooSmallError(
+            f"figure is too small ({w}x{h}); re-export at 800px or larger"
+        )
+    return np.asarray(img.convert("L"), dtype=np.uint8)
 
 
 def p_to_se(effect: float, p_value: float) -> float:

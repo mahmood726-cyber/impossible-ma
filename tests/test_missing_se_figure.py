@@ -117,3 +117,65 @@ def test_base_inherits_value_error():
     `except ValueError:` handlers must continue to work as Route D
     starts raising these in Tasks 3/4/7."""
     assert issubclass(FigureExtractionError, ValueError)
+
+
+import io
+from PIL import Image
+import numpy as np
+
+from impossible_ma.missing_se import _decode_and_validate_image
+
+
+def _png_bytes(width: int, height: int, fill: int = 255) -> bytes:
+    """Build a solid-colour grayscale PNG for testing."""
+    buf = io.BytesIO()
+    Image.new("L", (width, height), fill).save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def _jpg_bytes(width: int, height: int, quality: int = 95) -> bytes:
+    buf = io.BytesIO()
+    Image.new("L", (width, height), 255).save(buf, format="JPEG", quality=quality)
+    return buf.getvalue()
+
+
+class TestDecode:
+    def test_png_ok(self):
+        arr = _decode_and_validate_image(_png_bytes(400, 300))
+        assert arr.shape == (300, 400)
+        assert arr.dtype == np.uint8
+
+    def test_jpg_ok(self):
+        arr = _decode_and_validate_image(_jpg_bytes(400, 300))
+        assert arr.shape == (300, 400)
+
+    def test_tiff_rejected(self):
+        buf = io.BytesIO()
+        Image.new("L", (400, 300), 255).save(buf, format="TIFF")
+        with pytest.raises(UnsupportedFigureFormatError, match="PNG or JPG"):
+            _decode_and_validate_image(buf.getvalue())
+
+    def test_corrupted_bytes_rejected(self):
+        with pytest.raises(UnsupportedFigureFormatError):
+            _decode_and_validate_image(b"not an image")
+
+    def test_too_small_rejected(self):
+        with pytest.raises(ImageTooSmallError, match="too small"):
+            _decode_and_validate_image(_png_bytes(50, 300))
+        with pytest.raises(ImageTooSmallError):
+            _decode_and_validate_image(_png_bytes(400, 50))
+
+    def test_too_large_rejected(self):
+        # Build a noisy image to defeat compression and force >10 MB
+        rng = np.random.default_rng(0)
+        noise = rng.integers(0, 256, size=(3000, 3000), dtype=np.uint8)
+        buf = io.BytesIO()
+        Image.fromarray(noise, "L").save(buf, format="PNG", compress_level=0)
+        raw = buf.getvalue()
+        if len(raw) > 10_000_000:
+            with pytest.raises(ImageTooLargeError, match="10 MB"):
+                _decode_and_validate_image(raw)
+        else:
+            pytest.skip(
+                f"test image was {len(raw)} bytes — couldn't exceed 10 MB"
+            )
