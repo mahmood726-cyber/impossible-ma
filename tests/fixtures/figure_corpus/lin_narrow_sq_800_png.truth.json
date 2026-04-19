@@ -1,0 +1,95 @@
+{
+  "slug": "lin_narrow_sq_800_png",
+  "scale": "linear",
+  "axis_min": -0.5,
+  "axis_max": 0.5,
+  "width_px": 800,
+  "height_px": 600,
+  "format": "png",
+  "jpg_quality": null,
+  "n_studies": 7,
+  "marker": "s",
+  "calibration_clicks": [
+    {
+      "pixel_x": 219,
+      "value": -0.3
+    },
+    {
+      "pixel_x": 644,
+      "value": 0.30000000000000004
+    }
+  ],
+  "studies": [
+    {
+      "study_index": 0,
+      "label": "Study 1",
+      "click_y": 59,
+      "lower_x_true": -351,
+      "upper_x_true": 376,
+      "effect_x_true": 13,
+      "effect_true": -0.5923600617931639,
+      "se_true": 0.2623766435881261
+    },
+    {
+      "study_index": 1,
+      "label": "Study 2",
+      "click_y": 135,
+      "lower_x_true": -4,
+      "upper_x_true": 330,
+      "effect_x_true": 163,
+      "effect_true": -0.3794963820492569,
+      "se_true": 0.12067102774313142
+    },
+    {
+      "study_index": 2,
+      "label": "Study 3",
+      "click_y": 212,
+      "lower_x_true": -123,
+      "upper_x_true": 586,
+      "effect_x_true": 231,
+      "effect_true": -0.28352079975892863,
+      "se_true": 0.25582797429578324
+    },
+    {
+      "study_index": 3,
+      "label": "Study 4",
+      "click_y": 288,
+      "lower_x_true": 553,
+      "upper_x_true": 907,
+      "effect_x_true": 730,
+      "effect_true": 0.4221329302929756,
+      "se_true": 0.12774236539621037
+    },
+    {
+      "study_index": 4,
+      "label": "Study 5",
+      "click_y": 365,
+      "lower_x_true": 242,
+      "upper_x_true": 1037,
+      "effect_x_true": 639,
+      "effect_true": 0.2940921334420441,
+      "se_true": 0.2868873742166209
+    },
+    {
+      "study_index": 5,
+      "label": "Study 6",
+      "click_y": 441,
+      "lower_x_true": 547,
+      "upper_x_true": 1031,
+      "effect_x_true": 789,
+      "effect_true": 0.506023547122651,
+      "se_true": 0.17473508896431583
+    },
+    {
+      "study_index": 6,
+      "label": "Study 7",
+      "click_y": 517,
+      "lower_x_true": 705,
+      "upper_x_true": 968,
+      "effect_x_true": 837,
+      "effect_true": 0.5730928034229544,
+      "se_true": 0.09508374174755788
+    }
+  ],
+  "conf_level": 0.95
+}

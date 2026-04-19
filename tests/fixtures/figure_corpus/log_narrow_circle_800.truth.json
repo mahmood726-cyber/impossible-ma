@@ -1,0 +1,85 @@
+{
+  "slug": "log_narrow_circle_800",
+  "scale": "log",
+  "axis_min": 0.3,
+  "axis_max": 3.0,
+  "width_px": 800,
+  "height_px": 600,
+  "format": "png",
+  "jpg_quality": null,
+  "n_studies": 6,
+  "marker": "o",
+  "calibration_clicks": [
+    {
+      "pixel_x": 198,
+      "value": 0.44999999999999996
+    },
+    {
+      "pixel_x": 639,
+      "value": 2.0
+    }
+  ],
+  "studies": [
+    {
+      "study_index": 0,
+      "label": "Study 1",
+      "click_y": 62,
+      "lower_x_true": 398,
+      "upper_x_true": 747,
+      "effect_x_true": 572,
+      "effect_true": 0.46679904252007764,
+      "se_true": 0.30151478388616115
+    },
+    {
+      "study_index": 1,
+      "label": "Study 2",
+      "click_y": 152,
+      "lower_x_true": 479,
+      "upper_x_true": 800,
+      "effect_x_true": 640,
+      "effect_true": 0.6938663155325033,
+      "se_true": 0.2763939813414438
+    },
+    {
+      "study_index": 2,
+      "label": "Study 3",
+      "click_y": 241,
+      "lower_x_true": 570,
+      "upper_x_true": 840,
+      "effect_x_true": 705,
+      "effect_true": 0.9146193559636966,
+      "se_true": 0.23350646100159406
+    },
+    {
+      "study_index": 3,
+      "label": "Study 4",
+      "click_y": 331,
+      "lower_x_true": 547,
+      "upper_x_true": 917,
+      "effect_x_true": 732,
+      "effect_true": 1.0052713220278495,
+      "se_true": 0.31898497159241
+    },
+    {
+      "study_index": 4,
+      "label": "Study 5",
+      "click_y": 420,
+      "lower_x_true": 274,
+      "upper_x_true": 499,
+      "effect_x_true": 387,
+      "effect_true": -0.16101776857994032,
+      "se_true": 0.19399578613233082
+    },
+    {
+      "study_index": 5,
+      "label": "Study 6",
+      "click_y": 510,
+      "lower_x_true": 134,
+      "upper_x_true": 491,
+      "effect_x_true": 313,
+      "effect_true": -0.4108305498591368,
+      "se_true": 0.3076894875321223
+    }
+  ],
+  "conf_level": 0.95
+}
