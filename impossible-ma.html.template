@@ -125,6 +125,49 @@
           <button id="ms-export-json">Download signed JSON</button>
           <button id="ms-export-report">Printable report</button>
         </div>
+        <hr style="margin:2em 0;">
+        <section class="route-d" data-route-d>
+          <h3>Route D - Figure extraction</h3>
+          <p class="hint">Upload a horizontal forest plot (PNG or JPG). Click two x-axis reference points and type their values to calibrate. Then click once per study row; drag the proposed whisker-cap handles if needed; confirm to add the row to the extraction table.</p>
+
+          <div class="route-d-controls" style="display:flex; gap:1em; flex-wrap:wrap; align-items:center; margin:1em 0;">
+            <label>Figure: <input type="file" id="route-d-file" accept="image/png,image/jpeg"></label>
+            <label>Scale:
+              <select id="route-d-scale">
+                <option value="log" selected>log (HR / OR / RR)</option>
+                <option value="linear">linear (SMD / mean diff)</option>
+              </select>
+            </label>
+            <label>Confidence: <input type="number" id="route-d-conf" value="0.95" min="0.5" max="0.999" step="0.01" style="width:5em;"></label>
+          </div>
+
+          <div class="route-d-canvas-wrap" style="max-width:100%; overflow:auto; border:1px solid #ccc; margin-bottom:0.5em;">
+            <canvas id="route-d-canvas" style="display:block; max-width:100%; cursor:crosshair;"></canvas>
+          </div>
+          <div id="route-d-status" class="banner" role="status" style="padding:0.4em 0.6em; background:#eef; border-left:3px solid #06c; margin-bottom:0.8em; font-family:system-ui,sans-serif; font-size:0.9em;">Upload a figure to begin.</div>
+
+          <details open style="margin-bottom:1em;">
+            <summary><strong>Calibration (2 x-axis points)</strong></summary>
+            <table id="route-d-cal-table" style="margin-top:0.5em; border-collapse:collapse;">
+              <thead><tr><th style="padding:0.2em 0.8em; border-bottom:1px solid #ccc;">#</th><th style="padding:0.2em 0.8em; border-bottom:1px solid #ccc;">pixel x</th><th style="padding:0.2em 0.8em; border-bottom:1px solid #ccc;">typed value</th></tr></thead>
+              <tbody id="route-d-cal-body"></tbody>
+            </table>
+            <button id="route-d-cal-reset" disabled style="margin-top:0.5em;">Reset calibration</button>
+          </details>
+
+          <details open>
+            <summary><strong>Extracted rows</strong></summary>
+            <table id="route-d-rows-table" style="margin-top:0.5em; border-collapse:collapse; width:100%;">
+              <thead><tr><th style="padding:0.2em 0.8em; border-bottom:1px solid #ccc; text-align:left;">Label</th><th style="padding:0.2em 0.8em; border-bottom:1px solid #ccc;">effect</th><th style="padding:0.2em 0.8em; border-bottom:1px solid #ccc;">SE</th><th style="padding:0.2em 0.8em; border-bottom:1px solid #ccc;">audit</th><th style="padding:0.2em 0.8em; border-bottom:1px solid #ccc;"></th></tr></thead>
+              <tbody id="route-d-rows-body"></tbody>
+            </table>
+            <div class="route-d-actions" style="margin-top:0.5em; display:flex; gap:0.5em; flex-wrap:wrap;">
+              <button id="route-d-export-tsv" disabled>Export TSV</button>
+              <button id="route-d-send-to-b" disabled>Send rows to Route B</button>
+              <button id="route-d-sign-bundle" disabled>Sign TruthCert bundle</button>
+            </div>
+          </details>
+        </section>
       </section>
       <section class="tab-pane" data-pane="adversarial">
         <h2>adversarial - worst/best defensible pool</h2>
