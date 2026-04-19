@@ -467,3 +467,37 @@ class TestExtractSeMath:
         rows = [RowClick(click_y=100, lower_handle_x=50, upper_handle_x=350)]
         result = extract_se_from_figure(img, cal, rows)
         assert result[0].audit["handle_outside_calibration_span"] is True
+
+
+def test_extract_se_round_trip(fixture_data):
+    truth, img = fixture_data
+    cal_clicks = truth["calibration_clicks"]
+    cal = Calibration(
+        scale=truth["scale"],
+        ref_pixel_1=cal_clicks[0]["pixel_x"],
+        ref_value_1=cal_clicks[0]["value"],
+        ref_pixel_2=cal_clicks[1]["pixel_x"],
+        ref_value_2=cal_clicks[1]["value"],
+    )
+    rows = [
+        RowClick(
+            click_y=s["click_y"],
+            lower_handle_x=s["lower_x_true"],
+            upper_handle_x=s["upper_x_true"],
+            label=s["label"],
+        )
+        for s in truth["studies"]
+    ]
+    results = extract_se_from_figure(
+        img, cal, rows, conf_level=truth["conf_level"]
+    )
+    assert len(results) == len(truth["studies"])
+    for r, s in zip(results, truth["studies"]):
+        assert abs(r.effect - s["effect_true"]) < 0.02, (
+            f"{truth['slug']}:{s['label']} effect "
+            f"{r.effect:.4f} vs truth {s['effect_true']:.4f}"
+        )
+        assert abs(r.se - s["se_true"]) < 0.02, (
+            f"{truth['slug']}:{s['label']} SE "
+            f"{r.se:.4f} vs truth {s['se_true']:.4f}"
+        )
