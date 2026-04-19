@@ -24,6 +24,41 @@ def _run_k1(payload: dict) -> dict:
 
 
 def _run_missing_se(payload: dict) -> dict:
+    # Route-D payload: figure extraction — multi-row output.
+    if payload.get("route") == "D":
+        from pathlib import Path
+        from .missing_se import (
+            Calibration, RowClick, build_figure_bundle,
+        )
+        from .truthcert import sign_bundle
+        from dataclasses import asdict
+        img_bytes = Path(payload["image"]).read_bytes()
+        cal_d = payload["calibration"]
+        cal = Calibration(
+            scale=cal_d["scale"],
+            ref_pixel_1=cal_d["ref_pixel_1"],
+            ref_value_1=cal_d["ref_value_1"],
+            ref_pixel_2=cal_d["ref_pixel_2"],
+            ref_value_2=cal_d["ref_value_2"],
+        )
+        rows = [RowClick(**r) for r in payload["rows"]]
+        bundle = build_figure_bundle(
+            img_bytes, cal, rows,
+            conf_level=payload.get("conf_level", 0.95),
+            engine_version=payload.get("engine_version", "0.1.1"),
+        )
+        out = {
+            "bundle": json.loads(json.dumps(asdict(bundle), default=float)),
+            "results": [
+                json.loads(json.dumps(asdict(r), default=float))
+                for r in bundle.results
+            ],
+        }
+        if payload.get("sign"):
+            out["signed"] = sign_bundle({"bundle": out["bundle"]})
+        return out
+
+    # Existing A/B/C path
     inp = MissingSeInput(**payload)
     env = missing_se_envelope(inp)
     return _envelope_to_dict(env)

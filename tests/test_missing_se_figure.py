@@ -641,3 +641,45 @@ def _bundle_to_jsonable(b) -> dict:
     """Convert a dataclass (possibly nested) to a JSON-serialisable dict."""
     from dataclasses import asdict
     return asdict(b)
+
+
+import subprocess
+
+
+def test_cli_route_d_replay(tmp_path):
+    fixture_stem = "log_narrow_sq_800_png"
+    truth = json.loads(
+        (FIXTURE_DIR / f"{fixture_stem}.truth.json").read_text("utf-8")
+    )
+    img_path = FIXTURE_DIR / f"{fixture_stem}.png"
+    spec = {
+        "route": "D",
+        "image": str(img_path),
+        "calibration": {
+            "scale": truth["scale"],
+            "ref_pixel_1": truth["calibration_clicks"][0]["pixel_x"],
+            "ref_value_1": truth["calibration_clicks"][0]["value"],
+            "ref_pixel_2": truth["calibration_clicks"][1]["pixel_x"],
+            "ref_value_2": truth["calibration_clicks"][1]["value"],
+        },
+        "rows": [
+            {"click_y": s["click_y"],
+             "lower_handle_x": s["lower_x_true"],
+             "upper_handle_x": s["upper_x_true"],
+             "label": s["label"]}
+            for s in truth["studies"]
+        ],
+        "conf_level": 0.95,
+    }
+    spec_path = tmp_path / "spec.json"
+    spec_path.write_text(json.dumps(spec), encoding="utf-8")
+    proc = subprocess.run(
+        ["python", "-m", "impossible_ma.cli", "missing_se", str(spec_path)],
+        capture_output=True, text=True, check=True,
+    )
+    out = json.loads(proc.stdout)
+    assert "results" in out
+    assert len(out["results"]) == len(truth["studies"])
+    for r, s in zip(out["results"], truth["studies"]):
+        assert abs(r["effect"] - s["effect_true"]) < 0.02
+        assert abs(r["se"] - s["se_true"]) < 0.02
