@@ -14,6 +14,7 @@ import pytest
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select, WebDriverWait
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -461,3 +462,195 @@ def test_python_traceback_shown_in_error_pane(page):
     )
     err = page.find_element(By.ID, "k1-error").text
     assert err.lower().startswith("error") or "target_se" in err or "positive" in err
+
+
+# ---------------------------------------------------------------------------
+# Route D — figure extraction (Tasks 17, 18, 19)
+# ---------------------------------------------------------------------------
+import json as _d_json
+from pathlib import Path as _d_Path
+
+_FIXTURE_DIR = _d_Path(__file__).parent / "fixtures" / "figure_corpus"
+_DEFAULT_FIXTURE = "log_narrow_sq_800_png"
+
+
+def _js_click_canvas(driver, canvas, px, py):
+    """Dispatch a synthetic MouseEvent at canvas-local (px, py). Sidesteps
+    Selenium's varying conventions for move_to_element_with_offset."""
+    driver.execute_script(
+        """
+        const c = arguments[0];
+        const px = arguments[1], py = arguments[2];
+        const rect = c.getBoundingClientRect();
+        const sx = rect.width / c.width;
+        const sy = rect.height / c.height;
+        const evt = new MouseEvent('click', {
+            bubbles: true, cancelable: true, view: window,
+            clientX: rect.left + px * sx,
+            clientY: rect.top + py * sy,
+        });
+        c.dispatchEvent(evt);
+        """,
+        canvas, int(px), int(py),
+    )
+
+
+def _do_d_calibration(driver, truth, fixture_stem=_DEFAULT_FIXTURE):
+    """Navigate to missing_se, upload fixture, and click the two calibration
+    points (with prompt-override to supply typed values).
+
+    Clears the file input before send_keys — Chrome dedupes same-path uploads
+    and skips the change event otherwise, leaving stale Route D closure state
+    (extractedRows, calibrationClicks) from a prior test.
+    """
+    driver.execute_script("location.hash = '#missing_se';")
+    # Clear the file input so send_keys always triggers the change event,
+    # even if the previous test uploaded the same file.
+    driver.execute_script("document.getElementById('route-d-file').value = '';")
+    fixture_path = str(_FIXTURE_DIR / f"{fixture_stem}.png")
+    driver.find_element(By.ID, "route-d-file").send_keys(fixture_path)
+    canvas = WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located((By.ID, "route-d-canvas"))
+    )
+    # Wait for canvas to be resized by the image's onload (proves onFile ran).
+    WebDriverWait(driver, 10).until(
+        lambda d: int(canvas.get_attribute("width") or 0) > 0
+    )
+    # Wait for onFile to finish resetting state: the status banner should
+    # return to the calibration prompt.
+    WebDriverWait(driver, 10).until(
+        lambda d: "Calibration" in _text_content(d, "route-d-status")
+    )
+    for c in truth["calibration_clicks"]:
+        driver.execute_script(
+            "window.prompt = () => arguments[0];", str(c["value"])
+        )
+        _js_click_canvas(driver, canvas, c["pixel_x"],
+                         int(canvas.get_attribute("height")) // 2)
+
+
+def test_route_d_calibration_flow(page):
+    """D-calibration: upload fixture, inject prompts, click 2 points,
+    assert calibration table populates + Reset button enables."""
+    driver = page
+    truth = _d_json.loads(
+        (_FIXTURE_DIR / f"{_DEFAULT_FIXTURE}.truth.json").read_text("utf-8")
+    )
+    _do_d_calibration(driver, truth)
+
+    WebDriverWait(driver, 10).until(
+        lambda d: len(d.find_elements(By.CSS_SELECTOR, "#route-d-cal-body tr")) == 2
+    )
+    reset_btn = driver.find_element(By.ID, "route-d-cal-reset")
+    assert reset_btn.get_attribute("disabled") in (None, "false"), \
+        "Reset button should be enabled after 2 calibration clicks"
+
+
+def test_route_d_one_row_flow(page):
+    """D-one-row: after calibration, click a row -> handles propose ->
+    Enter confirms -> extraction table has 1 row."""
+    driver = page
+    truth = _d_json.loads(
+        (_FIXTURE_DIR / f"{_DEFAULT_FIXTURE}.truth.json").read_text("utf-8")
+    )
+    _do_d_calibration(driver, truth)
+    canvas = driver.find_element(By.ID, "route-d-canvas")
+
+    # Click the first study row at its effect-x (pixel x at the marker)
+    first = truth["studies"][0]
+    # Set prompt to return the row label
+    driver.execute_script("window.prompt = () => 'Row 1';")
+    _js_click_canvas(driver, canvas, first["effect_x_true"], first["click_y"])
+
+    # Wait for the live preview status to appear (Live: means preview is set)
+    try:
+        WebDriverWait(driver, 25).until(
+            lambda d: (
+                "Live:" in _text_content(d, "route-d-status")
+                or "Detection failed" in _text_content(d, "route-d-status")
+            )
+        )
+    except Exception:
+        raise AssertionError(
+            f"row-click status never reached Live/Detection failed; "
+            f"status={_text_content(driver, 'route-d-status')!r}"
+        )
+    # Press Enter -- the onKeydown handler is attached to document
+    driver.execute_script(
+        "document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true}));"
+    )
+
+    # Expect 1 row in the extraction table (event-delegation may race; retry)
+    try:
+        WebDriverWait(driver, 10).until(
+            lambda d: len(d.find_elements(By.CSS_SELECTOR, "#route-d-rows-body tr")) == 1
+        )
+    except Exception:
+        raise AssertionError(
+            f"Enter never added a row; "
+            f"status={_text_content(driver, 'route-d-status')!r}; "
+            f"rows={len(driver.find_elements(By.CSS_SELECTOR, '#route-d-rows-body tr'))}"
+        )
+
+
+def test_route_d_multi_row_send_to_b(page):
+    """D-multi-row: extract 3 rows -> Send to Route B -> assert ms-effect
+    populated with the first row's effect."""
+    driver = page
+    truth = _d_json.loads(
+        (_FIXTURE_DIR / f"{_DEFAULT_FIXTURE}.truth.json").read_text("utf-8")
+    )
+    _do_d_calibration(driver, truth)
+    canvas = driver.find_element(By.ID, "route-d-canvas")
+
+    # Extract the first 3 rows
+    for i, study in enumerate(truth["studies"][:3]):
+        driver.execute_script("window.prompt = () => arguments[0];", f"Row {i+1}")
+        _js_click_canvas(driver, canvas, study["effect_x_true"], study["click_y"])
+        try:
+            WebDriverWait(driver, 25).until(
+                lambda d: (
+                    "Live:" in _text_content(d, "route-d-status")
+                    or "Detection failed" in _text_content(d, "route-d-status")
+                )
+            )
+        except Exception:
+            raise AssertionError(
+                f"row {i} Live/Detection failed never appeared; "
+                f"status={_text_content(driver, 'route-d-status')!r}"
+            )
+        driver.execute_script(
+            "document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true}));"
+        )
+        try:
+            WebDriverWait(driver, 10).until(
+                lambda d: len(d.find_elements(
+                    By.CSS_SELECTOR, "#route-d-rows-body tr"
+                )) == i + 1
+            )
+        except Exception:
+            raise AssertionError(
+                f"row {i} never added; "
+                f"status={_text_content(driver, 'route-d-status')!r}; "
+                f"rows={len(driver.find_elements(By.CSS_SELECTOR, '#route-d-rows-body tr'))}"
+            )
+
+    assert len(driver.find_elements(
+        By.CSS_SELECTOR, "#route-d-rows-body tr"
+    )) == 3
+
+    # Click Send-to-B
+    driver.find_element(By.ID, "route-d-send-to-b").click()
+
+    # Status should confirm send
+    WebDriverWait(driver, 5).until(
+        lambda d: "Route B" in _text_content(d, "route-d-status")
+    )
+
+    # ms-effect should have the first row's effect value
+    first_effect = float(driver.find_element(By.ID, "ms-effect").get_attribute("value"))
+    # Effect is captured by the JS from currentDraft.preview.effect; validate
+    # it's a finite number close to the fixture's truth (coarse tolerance
+    # because auto-detection may drift a few px from truth).
+    assert abs(first_effect - truth["studies"][0]["effect_true"]) < 0.1, \
+        f"ms-effect={first_effect} vs truth={truth['studies'][0]['effect_true']}"
