@@ -8,7 +8,6 @@ from impossible_ma.missing_se import (
     p_to_se,
     ci_to_se,
     stat_to_se,
-    figure_to_se,
     missing_se_envelope,
     MissingSeInput,
 )
@@ -71,12 +70,6 @@ def test_stat_to_se_t_with_df():
 def test_stat_to_se_rejects_zero_statistic():
     with pytest.raises(ValueError, match="statistic"):
         stat_to_se(effect=0.4, statistic=0.0)
-
-
-# Route D stub
-def test_figure_to_se_is_stubbed_for_v1():
-    with pytest.raises(NotImplementedError, match="v1.1"):
-        figure_to_se(image_path="anything.png")
 
 
 # Envelope

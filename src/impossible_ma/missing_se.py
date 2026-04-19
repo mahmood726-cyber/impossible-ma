@@ -3,7 +3,8 @@
 Route A: p-value -> SE via z = ppf(1 - p/2)
 Route B: CI bounds -> SE via z or t(df)
 Route C: test statistic -> SE; statistic treated as z by default, or t(df)
-Route D: figure extraction (v1.1; raises NotImplementedError)
+Route D: figure extraction — extract_se_from_figure() from confirmed
+         whisker-cap handle positions on a horizontal forest plot.
 """
 import hashlib
 import io
@@ -305,14 +306,6 @@ def stat_to_se(effect: float, statistic: float, df: int | None = None) -> float:
         p = 2.0 * stats.t.sf(abs(statistic), df)
         z_equiv = stats.norm.ppf(1.0 - p / 2.0)
     return abs(effect) / z_equiv
-
-
-def figure_to_se(image_path: str) -> float:
-    """Route D (figure extraction) — deferred to v1.1."""
-    raise NotImplementedError(
-        "Route D (figure extraction) is scheduled for v1.1. "
-        "For v1, supply SE via p-value (Route A), CI (Route B), or statistic (Route C)."
-    )
 
 
 # ---------- Route D exceptions ----------
