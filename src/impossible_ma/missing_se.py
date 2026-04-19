@@ -61,6 +61,48 @@ def figure_to_se(image_path: str) -> float:
     )
 
 
+# ---------- Route D exceptions ----------
+
+class FigureExtractionError(ValueError):
+    """Base class for all Route D (figure extraction) errors."""
+
+
+class UnsupportedFigureFormatError(FigureExtractionError):
+    """Image is not PNG or JPG, or PIL cannot decode it."""
+
+
+class ImageTooSmallError(FigureExtractionError):
+    """Image width or height is below the minimum for reliable extraction."""
+
+
+class ImageTooLargeError(FigureExtractionError):
+    """Image bytes exceed the maximum accepted size."""
+
+
+class CalibrationError(FigureExtractionError):
+    """Calibration clicks are invalid (coincident pixels, equal/negative values, out of bounds)."""
+
+
+class ClickYOutOfBoundsError(FigureExtractionError):
+    """Row-click y-coordinate falls outside the image."""
+
+
+class NoWhiskerCapsDetectedError(FigureExtractionError):
+    """Edge-detection found fewer than two peaks above threshold."""
+
+
+class WhiskerCapsTooCloseError(FigureExtractionError):
+    """Detected peaks span fewer than 10 pixels — likely a false positive."""
+
+
+class HandlesCrossedError(FigureExtractionError):
+    """Confirmed lower handle is not strictly left of the upper handle."""
+
+
+class ConfidenceLevelInvalidError(FigureExtractionError):
+    """conf_level must satisfy 0 < conf_level < 1."""
+
+
 @dataclass
 class MissingSeInput:
     effect: float
