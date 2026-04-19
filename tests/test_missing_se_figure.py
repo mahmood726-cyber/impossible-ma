@@ -76,6 +76,14 @@ class TestCalibration:
             Calibration(scale="polar", ref_pixel_1=100, ref_value_1=0.5,  # type: ignore
                         ref_pixel_2=300, ref_value_2=2.0)
 
+    def test_nan_rejected(self):
+        with pytest.raises(CalibrationError, match="finite"):
+            Calibration(scale="log", ref_pixel_1=100, ref_value_1=float('nan'),
+                        ref_pixel_2=300, ref_value_2=2.0)
+        with pytest.raises(CalibrationError, match="finite"):
+            Calibration(scale="linear", ref_pixel_1=100, ref_value_1=0.5,
+                        ref_pixel_2=300, ref_value_2=float('inf'))
+
 
 class TestRowClick:
     def test_valid(self):
@@ -368,3 +376,94 @@ def test_propose_whisker_caps_round_trip(fixture_data):
             f"upper cap off by {hi - study['upper_x_true']} px "
             f"in {truth['slug']}:{study['label']} (tol={tol})"
         )
+
+
+from impossible_ma.missing_se import extract_se_from_figure
+
+
+class TestExtractSeMath:
+    def _tiny_png(self, w=400, h=200):
+        return _png_bytes(w, h)
+
+    def test_log_scale_math(self):
+        # Calibration: pixel 100 → 0.5, pixel 300 → 2.0 (log-scale)
+        # Handles: lower=120, upper=280 on a 95% CI.
+        #   m_log = (log(2.0) - log(0.5)) / (300 - 100) = ln(4)/200 ≈ 0.006931
+        #   b_log = log(0.5) - m_log * 100 = -0.6931 - 0.6931 = -1.3863
+        #   log_lo = 0.006931*120 - 1.3863 = -0.5546
+        #   log_hi = 0.006931*280 - 1.3863 = 0.5546
+        #   effect = 0
+        #   se = (0.5546 - (-0.5546)) / (2 * 1.959964) = 0.28296
+        img = self._tiny_png()
+        cal = Calibration(scale="log", ref_pixel_1=100, ref_value_1=0.5,
+                          ref_pixel_2=300, ref_value_2=2.0)
+        rows = [RowClick(click_y=100, lower_handle_x=120, upper_handle_x=280)]
+        result = extract_se_from_figure(img, cal, rows, conf_level=0.95)
+        assert len(result) == 1
+        r = result[0]
+        assert r.scale == "log"
+        assert abs(r.effect - 0.0) < 1e-6
+        assert abs(r.se - 0.28296) < 1e-4
+        assert r.audit["z_value"] == pytest.approx(1.959964, abs=1e-4)
+        assert r.audit["assumed_symmetric_ci"] is True
+
+    def test_linear_scale_math(self):
+        img = self._tiny_png()
+        cal = Calibration(scale="linear", ref_pixel_1=50, ref_value_1=-1.0,
+                          ref_pixel_2=450, ref_value_2=1.0)
+        # m = (1 - -1) / (450 - 50) = 0.005 per px
+        # b = -1 - 0.005*50 = -1.25
+        # lower_x=150 → v = -0.5, upper_x=350 → v = 0.5, effect=0
+        # se = (0.5 - -0.5) / (2 * 1.959964) = 0.25510
+        rows = [RowClick(click_y=100, lower_handle_x=150, upper_handle_x=350)]
+        result = extract_se_from_figure(img, cal, rows, conf_level=0.95)
+        r = result[0]
+        assert r.scale == "linear"
+        assert abs(r.effect - 0.0) < 1e-6
+        assert abs(r.se - 0.25510) < 1e-4
+
+    def test_non_default_conf_level(self):
+        img = self._tiny_png()
+        cal = Calibration(scale="linear", ref_pixel_1=0, ref_value_1=0.0,
+                          ref_pixel_2=400, ref_value_2=4.0)
+        rows = [RowClick(click_y=100, lower_handle_x=100, upper_handle_x=300)]
+        # At 99% conf, z ≈ 2.5758
+        result = extract_se_from_figure(img, cal, rows, conf_level=0.99)
+        r = result[0]
+        assert r.conf_level == 0.99
+        assert abs(r.audit["z_value"] - 2.5758) < 1e-3
+
+    def test_handles_crossed_rejected(self):
+        img = self._tiny_png()
+        cal = Calibration(scale="log", ref_pixel_1=100, ref_value_1=0.5,
+                          ref_pixel_2=300, ref_value_2=2.0)
+        rows = [RowClick(click_y=100, lower_handle_x=280, upper_handle_x=120)]
+        with pytest.raises(HandlesCrossedError):
+            extract_se_from_figure(img, cal, rows)
+
+    def test_invalid_conf_level_rejected(self):
+        img = self._tiny_png()
+        cal = Calibration(scale="log", ref_pixel_1=100, ref_value_1=0.5,
+                          ref_pixel_2=300, ref_value_2=2.0)
+        rows = [RowClick(click_y=100, lower_handle_x=120, upper_handle_x=280)]
+        with pytest.raises(ConfidenceLevelInvalidError):
+            extract_se_from_figure(img, cal, rows, conf_level=0.0)
+        with pytest.raises(ConfidenceLevelInvalidError):
+            extract_se_from_figure(img, cal, rows, conf_level=1.0)
+        with pytest.raises(ConfidenceLevelInvalidError):
+            extract_se_from_figure(img, cal, rows, conf_level=1.5)
+
+    def test_empty_rows_returns_empty(self):
+        img = self._tiny_png()
+        cal = Calibration(scale="log", ref_pixel_1=100, ref_value_1=0.5,
+                          ref_pixel_2=300, ref_value_2=2.0)
+        assert extract_se_from_figure(img, cal, rows=[]) == []
+
+    def test_handle_outside_calibration_span_flagged(self):
+        img = self._tiny_png()
+        cal = Calibration(scale="log", ref_pixel_1=100, ref_value_1=0.5,
+                          ref_pixel_2=300, ref_value_2=2.0)
+        # Handles outside [100, 300]
+        rows = [RowClick(click_y=100, lower_handle_x=50, upper_handle_x=350)]
+        result = extract_se_from_figure(img, cal, rows)
+        assert result[0].audit["handle_outside_calibration_span"] is True

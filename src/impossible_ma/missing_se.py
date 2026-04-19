@@ -6,6 +6,7 @@ Route C: test statistic -> SE; statistic treated as z by default, or t(df)
 Route D: figure extraction (v1.1; raises NotImplementedError)
 """
 import io
+import math
 from dataclasses import dataclass, field
 from statistics import median
 from typing import Literal
@@ -365,6 +366,11 @@ class Calibration:
     ref_value_2: float
 
     def __post_init__(self):
+        if not (math.isfinite(self.ref_value_1) and math.isfinite(self.ref_value_2)):
+            raise CalibrationError(
+                f"calibration values must be finite, got "
+                f"ref_value_1={self.ref_value_1}, ref_value_2={self.ref_value_2}"
+            )
         if self.scale not in ("log", "linear"):
             raise CalibrationError(
                 f"scale must be 'log' or 'linear', got {self.scale!r}"
@@ -411,6 +417,79 @@ class FigureExtractionBundle:
     results: list[RowExtraction]
     engine_version: str
     timestamp_iso: str
+
+
+def _calibration_params(cal: Calibration) -> tuple[float, float]:
+    """Return (m, b) such that the native-scale value at pixel x is m*x + b.
+    For log scale, 'value' means log(hr)."""
+    if cal.scale == "log":
+        v1, v2 = math.log(cal.ref_value_1), math.log(cal.ref_value_2)
+    else:
+        v1, v2 = cal.ref_value_1, cal.ref_value_2
+    m = (v2 - v1) / (cal.ref_pixel_2 - cal.ref_pixel_1)
+    b = v1 - m * cal.ref_pixel_1
+    return m, b
+
+
+def extract_se_from_figure(
+    image_bytes: bytes,
+    calibration: Calibration,
+    rows: list[RowClick],
+    conf_level: float = 0.95,
+) -> list[RowExtraction]:
+    """Deterministic computation of (effect, SE) per row from confirmed
+    whisker-cap handle positions. Native-scale output (log for log plots,
+    linear for linear plots).
+
+    Raises ConfidenceLevelInvalidError, HandlesCrossedError, plus any image
+    decoding errors from _decode_and_validate_image.
+    """
+    if not (0.0 < conf_level < 1.0):
+        raise ConfidenceLevelInvalidError(
+            f"conf_level must be in (0, 1), got {conf_level}"
+        )
+    # Validates image even though math only needs pixel coords — symmetry
+    # with propose_whisker_caps, plus early rejection of bad bundles.
+    _decode_and_validate_image(image_bytes)
+
+    m, b = _calibration_params(calibration)
+    z = stats.norm.ppf((1.0 + conf_level) / 2.0)
+
+    cal_p_lo = min(calibration.ref_pixel_1, calibration.ref_pixel_2)
+    cal_p_hi = max(calibration.ref_pixel_1, calibration.ref_pixel_2)
+
+    results: list[RowExtraction] = []
+    for row in rows:
+        if row.lower_handle_x >= row.upper_handle_x:
+            raise HandlesCrossedError(
+                f"lower_handle_x ({row.lower_handle_x}) must be strictly "
+                f"less than upper_handle_x ({row.upper_handle_x})"
+            )
+        value_lo = m * row.lower_handle_x + b
+        value_hi = m * row.upper_handle_x + b
+        effect = (value_lo + value_hi) / 2.0
+        se = (value_hi - value_lo) / (2.0 * z)
+        outside = (
+            row.lower_handle_x < cal_p_lo or row.lower_handle_x > cal_p_hi
+            or row.upper_handle_x < cal_p_lo or row.upper_handle_x > cal_p_hi
+        )
+        audit = {
+            "lower_x": int(row.lower_handle_x),
+            "upper_x": int(row.upper_handle_x),
+            "click_y": int(row.click_y),
+            "pixel_delta": int(row.upper_handle_x - row.lower_handle_x),
+            "z_value": float(z),
+            "assumed_symmetric_ci": True,
+            "handle_outside_calibration_span": bool(outside),
+        }
+        results.append(RowExtraction(
+            effect=float(effect),
+            se=float(abs(se)),
+            conf_level=float(conf_level),
+            scale=calibration.scale,
+            audit=audit,
+        ))
+    return results
 
 
 @dataclass
