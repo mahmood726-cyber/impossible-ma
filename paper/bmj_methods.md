@@ -69,7 +69,7 @@ A Possibility Envelope is not a point estimate. It does not replace conventional
 
 ### 5.2 Boundary cases
 
-The framework breaks where meta-analytic principle itself breaks. With zero studies, there is no envelope. With pure narrative evidence (no quantitative effect, no extractable summary), there is no envelope. Where a reviewer refuses to state any inclusion rule publicly, the adversarial envelope is undefined. The v1 implementation defers figure-extraction reconstruction (missing_se Route D), incommensurable-outcomes bridging, and per-MA study-level envelope runs across the MetaAudit corpus to subsequent versions.
+The framework breaks where meta-analytic principle itself breaks. With zero studies, there is no envelope. With pure narrative evidence (no quantitative effect, no extractable summary), there is no envelope. Where a reviewer refuses to state any inclusion rule publicly, the adversarial envelope is undefined. The v0.1.0 implementation defers figure-extraction reconstruction (shipped in v0.1.1), incommensurable-outcomes bridging, and per-MA study-level envelope runs across the MetaAudit corpus; the latter two remain deferred to subsequent versions.
 
 ### 5.3 Prior work
 
