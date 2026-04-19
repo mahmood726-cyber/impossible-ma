@@ -220,8 +220,8 @@
         status('Loading Python runtime (~6 MB)...');
         const pyodide = await loadPyodide({ indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.27.7/full/' });
 
-        status('Installing scipy + numpy + pandas (~40 MB)...');
-        await pyodide.loadPackage(['scipy', 'numpy', 'pandas']);
+        status('Installing scipy + numpy + pandas + pillow (~40 MB)...');
+        await pyodide.loadPackage(['scipy', 'numpy', 'pandas', 'pillow']);
 
         status('Installing micropip...');
         await pyodide.loadPackage('micropip');
