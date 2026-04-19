@@ -24,51 +24,51 @@
       "study_index": 0,
       "label": "Study 1",
       "click_y": 39,
-      "lower_x_true": 226,
-      "upper_x_true": 479,
-      "effect_x_true": 353,
-      "effect_true": 0.3948999330677462,
-      "se_true": 0.2106528974430813
+      "lower_x_true": 182,
+      "upper_x_true": 276,
+      "effect_x_true": 229,
+      "effect_true": -0.009561029721851022,
+      "se_true": 0.07810378977121095
     },
     {
       "study_index": 1,
       "label": "Study 2",
       "click_y": 88,
-      "lower_x_true": 65,
-      "upper_x_true": 367,
-      "effect_x_true": 216,
-      "effect_true": -0.050095818768039035,
-      "se_true": 0.2512183152484044
+      "lower_x_true": 232,
+      "upper_x_true": 290,
+      "effect_x_true": 261,
+      "effect_true": 0.09532796759967999,
+      "se_true": 0.04830441976826865
     },
     {
       "study_index": 2,
       "label": "Study 3",
       "click_y": 138,
-      "lower_x_true": 204,
-      "upper_x_true": 578,
-      "effect_x_true": 391,
-      "effect_true": 0.5206805449173421,
-      "se_true": 0.31083022208529
+      "lower_x_true": 241,
+      "upper_x_true": 345,
+      "effect_x_true": 293,
+      "effect_true": 0.19905050069471714,
+      "se_true": 0.0865267533079185
     },
     {
       "study_index": 3,
       "label": "Study 4",
       "click_y": 188,
-      "lower_x_true": 80,
-      "upper_x_true": 300,
-      "effect_x_true": 190,
-      "effect_true": -0.13422100937840764,
-      "se_true": 0.1829205043975969
+      "lower_x_true": 179,
+      "upper_x_true": 230,
+      "effect_x_true": 205,
+      "effect_true": -0.08705816863408755,
+      "se_true": 0.04267093299626116
     },
     {
       "study_index": 4,
       "label": "Study 5",
       "click_y": 238,
-      "lower_x_true": 32,
-      "upper_x_true": 246,
-      "effect_x_true": 139,
-      "effect_true": -0.30111811911963243,
-      "se_true": 0.17818190132668096
+      "lower_x_true": 180,
+      "upper_x_true": 218,
+      "effect_x_true": 199,
+      "effect_true": -0.10589205717753197,
+      "se_true": 0.031494581974744564
     }
   ],
   "conf_level": 0.95

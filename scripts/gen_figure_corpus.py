@@ -43,15 +43,6 @@ def _fixtures() -> list[FixtureSpec]:
     rng = np.random.default_rng(20260418)
     specs: list[FixtureSpec] = []
 
-    def eff_log(n):
-        return rng.uniform(-1.2, 1.2, size=n).tolist()
-
-    def eff_linear(n):
-        return rng.uniform(-0.6, 0.6, size=n).tolist()
-
-    def ses_for(n):
-        return rng.uniform(0.08, 0.35, size=n).tolist()
-
     configs = [
         # (slug, scale, min, max, w, h, fmt, q, n_studies, marker)
         ("log_narrow_sq_400_png",   "log",    0.3,  3.0,  400,  300, "png", None, 5,  "s"),
@@ -77,8 +68,38 @@ def _fixtures() -> list[FixtureSpec]:
     ]
     for cfg in configs:
         slug, scale, amin, amax, w, h, fmt, q, n, marker = cfg
-        effects = eff_log(n) if scale == "log" else eff_linear(n)
-        ses = ses_for(n)
+        # Compute native-scale bounds for sampling. For log axes, work in
+        # log-space; for linear, directly.
+        if scale == "log":
+            lo_native, hi_native = math.log(amin), math.log(amax)
+        else:
+            lo_native, hi_native = amin, amax
+        # CI half-width bound: pick SE and effect such that effect +/- z*SE
+        # stays inside [lo_native + margin, hi_native - margin]. margin is
+        # 5% of the axis range so the rendered figure has visible padding.
+        z = 1.959964
+        margin = 0.05 * (hi_native - lo_native)
+        inner_lo = lo_native + margin
+        inner_hi = hi_native - margin
+        inner_range = inner_hi - inner_lo
+        # Maximum SE such that a centred effect still has CI inside the
+        # inner range. For safety, use 40% of the inner half-range.
+        max_se = (inner_range / 2.0) * 0.40 / z
+        # Minimum effect offset from the inner edges to fit the CI at max SE
+        se_samples = rng.uniform(0.05 * inner_range / (2.0 * z),
+                                 max_se, size=n).tolist()
+        effects_raw = []
+        for se in se_samples:
+            # Centre range for effect: from (inner_lo + z*se) to (inner_hi - z*se)
+            eff_lo = inner_lo + z * se
+            eff_hi = inner_hi - z * se
+            if eff_hi <= eff_lo:
+                # Degenerate - shouldn't happen with max_se = 40% but guard
+                effects_raw.append((inner_lo + inner_hi) / 2.0)
+            else:
+                effects_raw.append(float(rng.uniform(eff_lo, eff_hi)))
+        effects = effects_raw  # already in native scale
+        ses = se_samples
         specs.append(FixtureSpec(
             slug=slug, scale=scale, axis_min=amin, axis_max=amax,
             width_px=w, height_px=h, fmt=fmt, jpg_quality=q,
@@ -172,6 +193,19 @@ def _render(spec: FixtureSpec) -> tuple[bytes, dict]:
     cal_p2 = int(round(ax.transData.transform((cal_v2, 1.0))[0]))
 
     plt.close(fig)
+
+    for row in true_rows:
+        for key in ("lower_x_true", "upper_x_true", "effect_x_true"):
+            if not (0 <= row[key] <= spec.width_px):
+                raise ValueError(
+                    f"{spec.slug} {row['label']}: {key}={row[key]} "
+                    f"out of image bounds [0, {spec.width_px}]"
+                )
+        if not (0 <= row["click_y"] <= spec.height_px):
+            raise ValueError(
+                f"{spec.slug} {row['label']}: click_y={row['click_y']} "
+                f"out of image bounds [0, {spec.height_px}]"
+            )
 
     truth = {
         "slug": spec.slug,

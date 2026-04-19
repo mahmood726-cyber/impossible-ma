@@ -24,81 +24,81 @@
       "study_index": 0,
       "label": "Study 1",
       "click_y": 56,
-      "lower_x_true": 281,
-      "upper_x_true": 331,
-      "effect_x_true": 306,
-      "effect_true": -1.0625048388547462,
-      "se_true": 0.10711364471180143
+      "lower_x_true": 173,
+      "upper_x_true": 217,
+      "effect_x_true": 195,
+      "effect_true": -2.0037208444809282,
+      "se_true": 0.09636383912949403
     },
     {
       "study_index": 1,
       "label": "Study 2",
       "click_y": 122,
-      "lower_x_true": 519,
-      "upper_x_true": 572,
-      "effect_x_true": 545,
-      "effect_true": 0.9635742103821119,
-      "se_true": 0.11396602810413639
+      "lower_x_true": 164,
+      "upper_x_true": 397,
+      "effect_x_true": 280,
+      "effect_true": -1.280254333125936,
+      "se_true": 0.5028170900819965
     },
     {
       "study_index": 2,
       "label": "Study 3",
       "click_y": 187,
-      "lower_x_true": 348,
-      "upper_x_true": 400,
-      "effect_x_true": 374,
-      "effect_true": -0.48412815886578797,
-      "se_true": 0.11270053394421578
+      "lower_x_true": 179,
+      "upper_x_true": 277,
+      "effect_x_true": 228,
+      "effect_true": -1.7276315218455327,
+      "se_true": 0.21239242248865445
     },
     {
       "study_index": 3,
       "label": "Study 4",
       "click_y": 253,
-      "lower_x_true": 263,
-      "upper_x_true": 352,
-      "effect_x_true": 308,
-      "effect_true": -1.0503535781162563,
-      "se_true": 0.19170851685215762
+      "lower_x_true": 358,
+      "upper_x_true": 403,
+      "effect_x_true": 381,
+      "effect_true": -0.4317570936718469,
+      "se_true": 0.09880151273960865
     },
     {
       "study_index": 4,
       "label": "Study 5",
       "click_y": 319,
-      "lower_x_true": 410,
-      "upper_x_true": 500,
-      "effect_x_true": 455,
-      "effect_true": 0.1998673351939837,
-      "se_true": 0.19571584708805517
+      "lower_x_true": 317,
+      "upper_x_true": 479,
+      "effect_x_true": 398,
+      "effect_true": -0.28725352076280175,
+      "se_true": 0.3496092760473412
     },
     {
       "study_index": 5,
       "label": "Study 6",
       "click_y": 384,
-      "lower_x_true": 377,
-      "upper_x_true": 418,
-      "effect_x_true": 398,
-      "effect_true": -0.28802132155794213,
-      "se_true": 0.08971597220056897
+      "lower_x_true": 132,
+      "upper_x_true": 249,
+      "effect_x_true": 190,
+      "effect_true": -2.044236581691895,
+      "se_true": 0.2517335634909319
     },
     {
       "study_index": 6,
       "label": "Study 7",
       "click_y": 450,
-      "lower_x_true": 449,
-      "upper_x_true": 515,
-      "effect_x_true": 482,
-      "effect_true": 0.42831188070138326,
-      "se_true": 0.1412082576669705
+      "lower_x_true": 216,
+      "upper_x_true": 399,
+      "effect_x_true": 308,
+      "effect_true": -1.0500922260977292,
+      "se_true": 0.395437709157502
     },
     {
       "study_index": 7,
       "label": "Study 8",
       "click_y": 516,
-      "lower_x_true": 422,
-      "upper_x_true": 500,
-      "effect_x_true": 461,
-      "effect_true": 0.24914853826562489,
-      "se_true": 0.16926691053770837
+      "lower_x_true": 269,
+      "upper_x_true": 435,
+      "effect_x_true": 352,
+      "effect_true": -0.6746682833511541,
+      "se_true": 0.3594956154805749
     }
   ],
   "conf_level": 0.95

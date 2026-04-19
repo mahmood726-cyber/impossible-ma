@@ -24,61 +24,61 @@
       "study_index": 0,
       "label": "Study 1",
       "click_y": 62,
-      "lower_x_true": 398,
-      "upper_x_true": 747,
-      "effect_x_true": 572,
-      "effect_true": 0.46679904252007764,
-      "se_true": 0.30151478388616115
+      "lower_x_true": 468,
+      "upper_x_true": 648,
+      "effect_x_true": 558,
+      "effect_true": 0.4167360654837373,
+      "se_true": 0.15493826012931586
     },
     {
       "study_index": 1,
       "label": "Study 2",
       "click_y": 152,
-      "lower_x_true": 479,
-      "upper_x_true": 800,
-      "effect_x_true": 640,
-      "effect_true": 0.6938663155325033,
-      "se_true": 0.2763939813414438
+      "lower_x_true": 413,
+      "upper_x_true": 613,
+      "effect_x_true": 513,
+      "effect_true": 0.26483049160334493,
+      "se_true": 0.1724444427633617
     },
     {
       "study_index": 2,
       "label": "Study 3",
       "click_y": 241,
-      "lower_x_true": 570,
-      "upper_x_true": 840,
-      "effect_x_true": 705,
-      "effect_true": 0.9146193559636966,
-      "se_true": 0.23350646100159406
+      "lower_x_true": 336,
+      "upper_x_true": 556,
+      "effect_x_true": 446,
+      "effect_true": 0.03845666412660631,
+      "se_true": 0.18946381764526252
     },
     {
       "study_index": 3,
       "label": "Study 4",
       "click_y": 331,
-      "lower_x_true": 547,
-      "upper_x_true": 917,
-      "effect_x_true": 732,
-      "effect_true": 1.0052713220278495,
-      "se_true": 0.31898497159241
+      "lower_x_true": 453,
+      "upper_x_true": 681,
+      "effect_x_true": 567,
+      "effect_true": 0.4488530247080663,
+      "se_true": 0.1964528031252068
     },
     {
       "study_index": 4,
       "label": "Study 5",
       "click_y": 420,
-      "lower_x_true": 274,
-      "upper_x_true": 499,
-      "effect_x_true": 387,
-      "effect_true": -0.16101776857994032,
-      "se_true": 0.19399578613233082
+      "lower_x_true": 319,
+      "upper_x_true": 442,
+      "effect_x_true": 381,
+      "effect_true": -0.18140613632531077,
+      "se_true": 0.10653553079702778
     },
     {
       "study_index": 5,
       "label": "Study 6",
       "click_y": 510,
-      "lower_x_true": 134,
-      "upper_x_true": 491,
-      "effect_x_true": 313,
-      "effect_true": -0.4108305498591368,
-      "se_true": 0.3076894875321223
+      "lower_x_true": 544,
+      "upper_x_true": 645,
+      "effect_x_true": 595,
+      "effect_true": 0.5412918181604378,
+      "se_true": 0.08727574000739137
     }
   ],
   "conf_level": 0.95
