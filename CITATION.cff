@@ -1,8 +1,8 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
 title: "ImpossibleMA: bounded synthesis for meta-analyses declared unpoolable"
-version: "0.1.0"
-date-released: "2026-04-16"
+version: "0.1.1"
+date-released: "2026-04-19"
 authors:
   - family-names: "Ahmad"
     given-names: "Mahmood"
