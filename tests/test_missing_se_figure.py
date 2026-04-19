@@ -40,6 +40,7 @@ def test_exception_subclasses_base(exc):
 from impossible_ma.missing_se import (
     Calibration, RowClick, RowExtraction, FigureExtractionBundle,
 )
+from impossible_ma.missing_se import _calibration_params
 
 
 class TestCalibration:
@@ -501,3 +502,94 @@ def test_extract_se_round_trip(fixture_data):
             f"{truth['slug']}:{s['label']} SE "
             f"{r.se:.4f} vs truth {s['se_true']:.4f}"
         )
+
+
+from hypothesis import given, strategies as st, settings
+
+
+@st.composite
+def _log_scenario(draw):
+    ref_value_1 = draw(st.floats(min_value=0.05, max_value=0.5))
+    ref_value_2 = draw(st.floats(min_value=1.5, max_value=20.0))
+    ref_pixel_1 = draw(st.integers(min_value=50, max_value=200))
+    ref_pixel_2 = draw(st.integers(min_value=350, max_value=550))
+    conf = draw(st.sampled_from([0.90, 0.95, 0.99]))
+    effect_true = draw(st.floats(min_value=-1.5, max_value=1.5))
+    se_true = draw(st.floats(min_value=0.05, max_value=0.5))
+    return dict(
+        scale="log",
+        ref_pixel_1=ref_pixel_1, ref_value_1=ref_value_1,
+        ref_pixel_2=ref_pixel_2, ref_value_2=ref_value_2,
+        conf=conf, effect_true=effect_true, se_true=se_true,
+    )
+
+
+@st.composite
+def _linear_scenario(draw):
+    # Bounds tightened from [-3.0, -0.1] / [0.1, 3.0] to guarantee
+    # ref_value_2 - ref_value_1 >= 0.6, so effect_true's st.floats range
+    # (ref_value_1 + 0.2, ref_value_2 - 0.2) is always non-empty.
+    # Otherwise hypothesis shrinks to (ref_value_1=-0.1, ref_value_2=0.1)
+    # and st.floats raises InvalidArgument.
+    ref_value_1 = draw(st.floats(min_value=-3.0, max_value=-0.3))
+    ref_value_2 = draw(st.floats(min_value=0.3, max_value=3.0))
+    ref_pixel_1 = draw(st.integers(min_value=50, max_value=200))
+    ref_pixel_2 = draw(st.integers(min_value=350, max_value=550))
+    conf = draw(st.sampled_from([0.90, 0.95, 0.99]))
+    effect_true = draw(st.floats(
+        min_value=(ref_value_1 + 0.2), max_value=(ref_value_2 - 0.2)
+    ))
+    se_true = draw(st.floats(min_value=0.02, max_value=0.3))
+    return dict(
+        scale="linear",
+        ref_pixel_1=ref_pixel_1, ref_value_1=ref_value_1,
+        ref_pixel_2=ref_pixel_2, ref_value_2=ref_value_2,
+        conf=conf, effect_true=effect_true, se_true=se_true,
+    )
+
+
+def _roundtrip_check(s):
+    """Invert calibration to place whisker caps at the true pixel positions,
+    then run extract_se_from_figure and assert |Δ| within slack."""
+    import io as _io
+    from PIL import Image as _Image
+    img = _io.BytesIO()
+    _Image.new("L", (600, 300), 255).save(img, format="PNG")
+    img_bytes = img.getvalue()
+
+    cal = Calibration(
+        scale=s["scale"],
+        ref_pixel_1=s["ref_pixel_1"], ref_value_1=s["ref_value_1"],
+        ref_pixel_2=s["ref_pixel_2"], ref_value_2=s["ref_value_2"],
+    )
+    m, b = _calibration_params(cal)  # inverse: pixel = (value - b) / m
+    from scipy.stats import norm
+    z = norm.ppf((1 + s["conf"]) / 2)
+
+    value_lo_true = s["effect_true"] - z * s["se_true"]
+    value_hi_true = s["effect_true"] + z * s["se_true"]
+    lower_px = int(round((value_lo_true - b) / m))
+    upper_px = int(round((value_hi_true - b) / m))
+    if lower_px >= upper_px:
+        return  # degenerate — skip; hypothesis sampled a tight scenario
+    rows = [RowClick(click_y=150, lower_handle_x=lower_px,
+                     upper_handle_x=upper_px)]
+    result = extract_se_from_figure(img_bytes, cal, rows, conf_level=s["conf"])
+    r = result[0]
+    # Pixel-integer rounding introduces O(|m|) error in the value domain.
+    # Allow 2 · |m| as slack above the math-purity 1e-6.
+    slack = 2 * abs(m)
+    assert abs(r.effect - s["effect_true"]) < 1e-4 + slack
+    assert abs(r.se - s["se_true"]) < 1e-4 + slack
+
+
+@given(_log_scenario())
+@settings(max_examples=50, deadline=2000, derandomize=True)
+def test_hypothesis_log_roundtrip(s):
+    _roundtrip_check(s)
+
+
+@given(_linear_scenario())
+@settings(max_examples=50, deadline=2000, derandomize=True)
+def test_hypothesis_linear_roundtrip(s):
+    _roundtrip_check(s)
