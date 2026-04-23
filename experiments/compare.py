@@ -6,15 +6,11 @@ from pathlib import Path
 from typing import Callable
 
 from experiments.cross_framing import run as run_cross_framing
-from experiments.disconnected_nma import run as run_disconnected_nma
 from experiments.era_collision import run as run_era_collision
-from experiments.extreme_het import run as run_extreme_het
 from experiments.pilot_envelope import PilotEnvelope
 
 _FIXTURES_DIR = Path(__file__).parent / "fixtures"
 _PILOTS: list[tuple[str, Callable[[dict], PilotEnvelope]]] = [
-    ("disconnected_nma", run_disconnected_nma),
-    ("extreme_het", run_extreme_het),
     ("cross_framing", run_cross_framing),
     ("era_collision", run_era_collision),
 ]
