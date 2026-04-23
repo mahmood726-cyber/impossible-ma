@@ -43,6 +43,11 @@ def test_upper_inf_without_unbounded_raises():
         _valid(upper=math.inf, point=None, min_info="no flag here")
 
 
+def test_lower_neg_inf_without_unbounded_raises():
+    with pytest.raises(ValueError, match="unbounded"):
+        _valid(lower=-math.inf, point=None, min_info="no flag here")
+
+
 def test_to_possibility_envelope_raises():
     env = _valid()
     with pytest.raises(NotImplementedError, match="promotion"):

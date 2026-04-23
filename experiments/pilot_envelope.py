@@ -50,6 +50,10 @@ class PilotEnvelope:
             raise ValueError(
                 "upper=inf requires 'unbounded' in min_info"
             )
+        if math.isinf(self.lower) and "unbounded" not in self.min_info:
+            raise ValueError(
+                "lower=-inf requires 'unbounded' in min_info"
+            )
 
     def to_possibility_envelope(self) -> PossibilityEnvelope:
         raise NotImplementedError(
