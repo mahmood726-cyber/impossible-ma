@@ -22,7 +22,7 @@ ImpossibleMA shipped publicly 2026-04-16. GitHub repo public, Pages live, v0.1.0
 | File | Commit | Role |
 |------|--------|------|
 | `README.md` | `106d907` | Public landing page |
-| `LICENSE` | `106d907` | MIT, `{{AUTHOR_1_NAME}}` placeholder |
+| `LICENSE` | `106d907` | MIT — author placeholder resolved to Mahmood Ahmad |
 | `CITATION.cff` | `106d907` | Machine-readable citation metadata |
 | `REVIEW_PLAN4.md` | (this commit) | This review |
 

@@ -1,0 +1,31 @@
+{
+  "normal": {
+    "studies": [
+      {"id": "s1", "effect": -0.80, "se": 0.10},
+      {"id": "s2", "effect": 0.70, "se": 0.10},
+      {"id": "s3", "effect": -0.50, "se": 0.12},
+      {"id": "s4", "effect": 0.90, "se": 0.11},
+      {"id": "s5", "effect": -0.60, "se": 0.13}
+    ],
+    "thresholds": {"i2_refuse_point": 0.80, "tau_ratio_refuse": 2.0}
+  },
+  "tight": {
+    "studies": [
+      {"id": "s1", "effect": 0.30, "se": 0.08},
+      {"id": "s2", "effect": 0.32, "se": 0.09},
+      {"id": "s3", "effect": 0.28, "se": 0.10},
+      {"id": "s4", "effect": 0.31, "se": 0.08},
+      {"id": "s5", "effect": 0.29, "se": 0.09}
+    ],
+    "thresholds": {"i2_refuse_point": 0.80, "tau_ratio_refuse": 2.0}
+  },
+  "unbounded": {
+    "studies": [
+      {"id": "s1", "effect": -2.0, "se": 0.05},
+      {"id": "s2", "effect": 2.0, "se": 0.05},
+      {"id": "s3", "effect": -1.8, "se": 0.05},
+      {"id": "s4", "effect": 1.9, "se": 0.05}
+    ],
+    "thresholds": {"i2_refuse_point": 0.80, "tau_ratio_refuse": 2.0}
+  }
+}
