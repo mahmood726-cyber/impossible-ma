@@ -215,6 +215,16 @@
   <script>
     const status = (msg) => { document.getElementById('splash-status').textContent = msg; };
 
+    // XSS guard for user-supplied strings rendered into innerHTML attribute
+    // values (k1/adv table row builders). The routeD module has its own
+    // escapeHtml inside its IIFE; this outer-scope copy serves k1AddRow and
+    // advAddRow which run before the IIFE is reachable.
+    function escapeHtml(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
     async function bootstrap() {
       try {
         status('Loading Python runtime (~6 MB)...');
@@ -297,9 +307,9 @@ print('ImpossibleMA loaded:', impossible_ma.__version__)
       const tbody = document.querySelector('#k1-adjacent tbody');
       const tr = document.createElement('tr');
       tr.innerHTML =
-        '<td><input type="text" class="k1-study" value="' + study + '" /></td>' +
-        '<td><input type="number" step="0.01" class="k1-est" value="' + est + '" /></td>' +
-        '<td><input type="number" step="0.01" class="k1-se"  value="' + se + '" /></td>' +
+        '<td><input type="text" class="k1-study" value="' + escapeHtml(study) + '" /></td>' +
+        '<td><input type="number" step="0.01" class="k1-est" value="' + escapeHtml(est) + '" /></td>' +
+        '<td><input type="number" step="0.01" class="k1-se"  value="' + escapeHtml(se) + '" /></td>' +
         '<td><button class="k1-row-del">x</button></td>';
       tr.querySelector('.k1-row-del').addEventListener('click', () => {
         tr.remove(); k1ValidateRunButton();
@@ -576,7 +586,7 @@ json.dumps(asdict(env), default=float)
         const type = ['estimate','se'].includes(c) ? 'number' :
                      (['n','followup'].includes(c) ? 'number' : 'text');
         const step = ['estimate','se'].includes(c) ? 'step="0.01"' : '';
-        return `<td><input type="${type}" ${step} class="adv-${c}" value="${v}" /></td>`;
+        return `<td><input type="${type}" ${step} class="adv-${c}" value="${escapeHtml(v)}" /></td>`;
       }).join('') + `<td><button class="adv-row-del">x</button></td>`;
       tr.querySelector('.adv-row-del').addEventListener('click', () => { tr.remove(); advValidateRun(); });
       for (const inp of tr.querySelectorAll('input')) inp.addEventListener('input', advValidateRun);
