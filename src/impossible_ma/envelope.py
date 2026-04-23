@@ -1,8 +1,9 @@
+import math
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-Case = Literal["k1", "missing_se", "adversarial"]
-_VALID_CASES = ("k1", "missing_se", "adversarial")
+Case = Literal["k1", "missing_se", "adversarial", "extreme_het", "disconnected_nma"]
+_VALID_CASES = ("k1", "missing_se", "adversarial", "extreme_het", "disconnected_nma")
 
 
 @dataclass
@@ -23,6 +24,14 @@ class PossibilityEnvelope:
         if self.lower > self.upper:
             raise ValueError(
                 f"lower ({self.lower}) must be <= upper ({self.upper})"
+            )
+        if math.isinf(self.upper) and "unbounded" not in self.min_info:
+            raise ValueError(
+                "upper=inf requires 'unbounded' in min_info"
+            )
+        if math.isinf(self.lower) and "unbounded" not in self.min_info:
+            raise ValueError(
+                "lower=-inf requires 'unbounded' in min_info"
             )
 
 
