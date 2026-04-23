@@ -7,3 +7,7 @@ build/
 dist/
 *.egg-info/
 *.truthcert_key
+STUCK_FAILURES.md
+STUCK_FAILURES.jsonl
+sentinel-findings.md
+sentinel-findings.jsonl

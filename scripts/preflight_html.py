@@ -7,7 +7,21 @@ import subprocess
 import sys
 from pathlib import Path
 
-BROWSER_ROTATOR = Path(r"C:\Users\user\browser_rotator.py")
+
+def resolve_browser_rotator():
+    env_path = os.getenv("BROWSER_ROTATOR_PATH", "")
+    candidates = []
+    if env_path:
+        candidates.append(Path(env_path).expanduser())
+    candidates.append(Path.home() / "browser_rotator.py")
+
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate.resolve()
+    return candidates[0]
+
+
+BROWSER_ROTATOR = resolve_browser_rotator()
 
 
 def check_selenium():
@@ -20,7 +34,10 @@ def check_selenium():
 
 def check_browser_rotator():
     if not BROWSER_ROTATOR.exists():
-        return False, f"browser_rotator.py not at {BROWSER_ROTATOR}"
+        return (
+            False,
+            f"browser_rotator.py not found. Set BROWSER_ROTATOR_PATH or place it at {BROWSER_ROTATOR}",
+        )
     return True, f"OK: {BROWSER_ROTATOR}"
 
 
