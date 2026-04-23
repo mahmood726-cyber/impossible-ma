@@ -106,6 +106,7 @@ def to_possibility_envelope(self) -> PossibilityEnvelope:
 - Indirect contrast: `d_AC = d̂₁ + anchor_gap − d̂₂`, where `anchor_gap ∈ [−δ, +δ]`.
 - Grid `anchor_gap` on 21 equally-spaced points; at each point compute the 95% CI; envelope is the union.
 - `point = classical indirect estimate` iff `δ == 0`, else `None`.
+- `k=1` bubble: use the single study's `effect` / `se²` as the bubble's `d̂` / `var` directly (no pool). `k=0` bubble raises `ValueError`.
 
 **Stress cases:** `δ=0` (matches classical indirect, `tight`), `δ=1.0` (`normal`), `δ=∞` (`unbounded`, `upper=inf`, `min_info` must contain `"unbounded"`), empty bubble → `ValueError`.
 
@@ -152,6 +153,7 @@ def to_possibility_envelope(self) -> PossibilityEnvelope:
 - REML random-effects pool on converted SMDs.
 - Envelope: `pooled ± 1.96 · SE`, where `SE` is inflated by the conversion-uncertainty terms (added in quadrature to each study's variance before pooling).
 - `point = pooled SMD` — bridging is principled, not just bounds, so a point is honest here.
+- `conversion_uncertainty` defaults when missing: `continuous_sd_cv = 0.05`, `responder_threshold_sd_cv = 0.10`. Defaults applied are logged in the envelope's `assumptions` dict.
 
 **Stress cases:** all-continuous (`tight` — matches classical SMD meta-analysis), all-responder (`tight` — matches probit pool), conflicting-signs mixed set (`normal` — wide envelope, high I²), unknown `frame` → `ValueError` listing valid values.
 
@@ -171,6 +173,7 @@ def to_possibility_envelope(self) -> PossibilityEnvelope:
 ```
 
 **Math:**
+- Era-reference control rate = arithmetic mean of `control_rate_per_year` across era-1 studies. For each era-2 study, `rate_ratio_era1_over_era2 = era1_ref_rate / study.control_rate_per_year`.
 - For β in 21-point grid over `[β_lo, β_hi]`: adjust era-2 studies' log-HR via `log_hr_adj = log_hr + β · log(rate_ratio_era1_over_era2)`; era-1 studies unchanged.
 - At each β: REML RE pool, 95% CI.
 - `lower = min` over β of `pooled − 1.96·SE`; `upper = max` over β of `pooled + 1.96·SE`.
@@ -185,7 +188,7 @@ Each JSON file has **three named cases**:
 | Case key | Purpose | Expected outcome |
 |---|---|---|
 | `normal` | realistic inputs | bounded envelope, reasonable width |
-| `tight` | degenerate params that collapse to classical (δ=0 / I²≈0 / all-one-frame / β=0) | envelope ≈ classical point ± classical CI (within ~5%) |
+| `tight` | degenerate params that collapse to classical (δ=0 / I²≈0 / all-one-frame / β=0) | envelope ≈ classical point ± classical CI (within ~5%). "Classical" = the same pool method with bridging/refusal off: REML RE pool for all four pilots. |
 | `unbounded` | pathological params (δ=inf / I²=99% / conflicting frames / β∈[−10,10]) | `upper=math.inf` with `"unbounded"` in `min_info`, OR controlled `ValueError` |
 
 Total: 12 fixture cases across 4 files.
@@ -206,7 +209,7 @@ Total: 12 fixture cases across 4 files.
 
 Output file committed; regenerated any time a pilot's math changes.
 
-## Tests (~22 total)
+## Tests (~24 total)
 
 - `test_pilot_envelope.py` (6): validation invariants mirror shipped `PossibilityEnvelope`; `upper=inf` without `"unbounded"` in `min_info` raises; `to_possibility_envelope()` raises `NotImplementedError`.
 - `test_{flavour}.py` × 4 (4 tests each = 16): `test_normal_bounded`, `test_tight_matches_classical` (within ~5% of classical sanity-check), `test_unbounded_flagged`, one pilot-specific guard (e.g. `test_k_lt_3_raises` for B, `test_unknown_frame_raises` for C).
