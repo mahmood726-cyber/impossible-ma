@@ -1,0 +1,27 @@
+{
+  "normal": {
+    "studies": [
+      {"id": "e1a", "era": 1, "log_hr": -0.25, "se": 0.08, "control_rate_per_year": 0.15},
+      {"id": "e1b", "era": 1, "log_hr": -0.20, "se": 0.09, "control_rate_per_year": 0.14},
+      {"id": "e2a", "era": 2, "log_hr": -0.18, "se": 0.09, "control_rate_per_year": 0.06},
+      {"id": "e2b", "era": 2, "log_hr": -0.15, "se": 0.10, "control_rate_per_year": 0.07}
+    ],
+    "bridging": {"beta_range": [-0.5, 0.5]}
+  },
+  "tight": {
+    "studies": [
+      {"id": "e1a", "era": 1, "log_hr": -0.25, "se": 0.08, "control_rate_per_year": 0.15},
+      {"id": "e1b", "era": 1, "log_hr": -0.22, "se": 0.09, "control_rate_per_year": 0.14},
+      {"id": "e2a", "era": 2, "log_hr": -0.24, "se": 0.09, "control_rate_per_year": 0.15},
+      {"id": "e2b", "era": 2, "log_hr": -0.23, "se": 0.10, "control_rate_per_year": 0.15}
+    ],
+    "bridging": {"beta_range": [0.0, 0.0]}
+  },
+  "unbounded": {
+    "studies": [
+      {"id": "e1a", "era": 1, "log_hr": -0.25, "se": 0.08, "control_rate_per_year": 0.20},
+      {"id": "e2a", "era": 2, "log_hr": -0.15, "se": 0.09, "control_rate_per_year": 0.05}
+    ],
+    "bridging": {"beta_range": [-5.0, 5.0]}
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "normal": {
+    "studies": [
+      {"id": "c1", "frame": "continuous", "mean_diff": -3.2, "pooled_sd": 12.4, "n1": 100, "n2": 100},
+      {"id": "c2", "frame": "continuous", "mean_diff": -2.8, "pooled_sd": 11.8, "n1": 120, "n2": 120},
+      {"id": "r1", "frame": "responder", "p_ctrl": 0.30, "p_trt": 0.42, "n1": 80, "n2": 80},
+      {"id": "o1", "frame": "ordinal_probit", "log_or": 0.45, "se": 0.14}
+    ],
+    "conversion_uncertainty": {"continuous_sd_cv": 0.10, "responder_threshold_sd_cv": 0.20}
+  },
+  "tight": {
+    "studies": [
+      {"id": "c1", "frame": "continuous", "mean_diff": -3.0, "pooled_sd": 12.0, "n1": 100, "n2": 100},
+      {"id": "c2", "frame": "continuous", "mean_diff": -2.9, "pooled_sd": 12.1, "n1": 110, "n2": 110},
+      {"id": "c3", "frame": "continuous", "mean_diff": -3.1, "pooled_sd": 11.9, "n1": 95, "n2": 95}
+    ],
+    "conversion_uncertainty": {"continuous_sd_cv": 0.05, "responder_threshold_sd_cv": 0.10}
+  },
+  "unbounded": {
+    "studies": [
+      {"id": "c1", "frame": "continuous", "mean_diff": -5.0, "pooled_sd": 10.0, "n1": 50, "n2": 50},
+      {"id": "r1", "frame": "responder", "p_ctrl": 0.60, "p_trt": 0.10, "n1": 50, "n2": 50},
+      {"id": "o1", "frame": "ordinal_probit", "log_or": 2.0, "se": 0.15}
+    ],
+    "conversion_uncertainty": {"continuous_sd_cv": 0.50, "responder_threshold_sd_cv": 0.50}
+  }
+}

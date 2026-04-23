@@ -1,0 +1,52 @@
+{
+  "normal": {
+    "bubble_1": {
+      "studies": [
+        {"id": "b1s1", "treat_a": "A", "treat_b": "B", "effect": -0.35, "se": 0.12},
+        {"id": "b1s2", "treat_a": "A", "treat_b": "B", "effect": -0.28, "se": 0.15}
+      ],
+      "anchor_treatment": "A"
+    },
+    "bubble_2": {
+      "studies": [
+        {"id": "b2s1", "treat_a": "C", "treat_b": "D", "effect": -0.40, "se": 0.14},
+        {"id": "b2s2", "treat_a": "C", "treat_b": "D", "effect": -0.33, "se": 0.18}
+      ],
+      "anchor_treatment": "C"
+    },
+    "bridging": {"delta_log_odds": 0.3},
+    "target_contrast": ["B", "D"]
+  },
+  "tight": {
+    "bubble_1": {
+      "studies": [
+        {"id": "b1s1", "treat_a": "A", "treat_b": "B", "effect": -0.35, "se": 0.12}
+      ],
+      "anchor_treatment": "A"
+    },
+    "bubble_2": {
+      "studies": [
+        {"id": "b2s1", "treat_a": "C", "treat_b": "D", "effect": -0.40, "se": 0.14}
+      ],
+      "anchor_treatment": "C"
+    },
+    "bridging": {"delta_log_odds": 0.0},
+    "target_contrast": ["B", "D"]
+  },
+  "unbounded": {
+    "bubble_1": {
+      "studies": [
+        {"id": "b1s1", "treat_a": "A", "treat_b": "B", "effect": -0.35, "se": 0.12}
+      ],
+      "anchor_treatment": "A"
+    },
+    "bubble_2": {
+      "studies": [
+        {"id": "b2s1", "treat_a": "C", "treat_b": "D", "effect": -0.40, "se": 0.14}
+      ],
+      "anchor_treatment": "C"
+    },
+    "bridging": {"delta_log_odds": null},
+    "target_contrast": ["B", "D"]
+  }
+}
