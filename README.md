@@ -3,7 +3,7 @@
 Bounded synthesis for Cochrane meta-analyses declared unpoolable.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Tests: 88/88](https://img.shields.io/badge/Tests-88%2F88-brightgreen.svg)](#testing)
+[![Tests: 182/182](https://img.shields.io/badge/Tests-182%2F182-brightgreen.svg)](#testing)
 
 ## What
 
@@ -23,8 +23,8 @@ Selenium UI tests are excluded from the default test run (3-minute Pyodide cold 
 git clone https://github.com/mahmood726-cyber/impossible-ma.git
 cd impossible-ma
 pip install -e .
-pytest tests/                              # engine: 66 tests (default; ~37s)
-pytest -m selenium tests/                  # HTML/Selenium: 22 tests (~12 min cold)
+pytest tests/                              # engine: 157 tests (default; ~50s)
+pytest -m selenium tests/                  # HTML/Selenium: 25 tests (~12 min cold)
 ```
 
 CLI:
@@ -37,7 +37,7 @@ impossible-ma k1 k1.json --sign
 
 - `src/impossible_ma/` — Python engine (envelope dataclass, k=1, missing_se, adversarial, TruthCert, CLI)
 - `impossible-ma.html` — single-file browser app (51 KB, Pyodide + Plotly)
-- `tests/` — 66 engine + 22 Selenium
+- `tests/` — 157 engine + 25 Selenium
 - `paper/` — E156, F1000, BMJ Methods drafts + shared refs.bib + 3 figures
 - `scripts/` — preflight, build_html, headline_run, export_figures
 
@@ -47,7 +47,7 @@ Of 6,229 Cochrane meta-analyses in MetaAudit, 444 (7.13%) carry at least one CRI
 
 ## Testing
 
-88 automated tests gate every commit:
+182 automated tests gate every commit:
 - R parity to 1e-4 against `metafor::rma(method="REML")` (kone) and qnorm-based reconstruction (missing_se)
 - Property tests via `hypothesis` for envelope monotonicity and full-data-REML containment
 - Regression baselines pinned at 1e-6
