@@ -6,6 +6,7 @@ Cold Pyodide load ~170s — fixtures use module scope so we pay that once.
 import http.server
 import json as _json
 import os
+import socket
 import socketserver
 import threading
 from pathlib import Path
@@ -19,27 +20,41 @@ from selenium.webdriver.support.ui import Select, WebDriverWait
 
 ROOT = Path(__file__).resolve().parents[1]
 HTML = ROOT / "impossible-ma.html"
+HOST = "127.0.0.1"
 PORT = 8765
-PAGE_URL = f"http://localhost:{PORT}/impossible-ma.html"
 # Cold Pyodide load observed 170s-300s depending on host network + WASM compile
 # speed. Env override lets fast CI machines shorten the wait if needed.
 PAGE_READY_TIMEOUT = int(os.environ.get("PAGE_READY_TIMEOUT", "450"))
 
 
+class ReusableTCPServer(socketserver.TCPServer):
+    allow_reuse_address = True
+
+
+def _find_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind((HOST, 0))
+        return sock.getsockname()[1]
+
+
 @pytest.fixture(scope="module")
 def server():
-    handler = http.server.SimpleHTTPRequestHandler
-    cwd_before = os.getcwd()
-    os.chdir(ROOT)
-    httpd = socketserver.TCPServer(("", PORT), handler)
+    handler = lambda *args, **kwargs: http.server.SimpleHTTPRequestHandler(
+        *args, directory=str(ROOT), **kwargs
+    )
+    port = PORT
+    try:
+        httpd = ReusableTCPServer((HOST, port), handler)
+    except OSError:
+        port = _find_port()
+        httpd = ReusableTCPServer((HOST, port), handler)
     thread = threading.Thread(target=httpd.serve_forever, daemon=True)
     thread.start()
     try:
-        yield
+        yield f"http://{HOST}:{port}/impossible-ma.html"
     finally:
         httpd.shutdown()
         httpd.server_close()
-        os.chdir(cwd_before)
 
 
 @pytest.fixture(scope="module")
@@ -53,7 +68,7 @@ def driver(server):
     opts.add_argument("--window-size=1400,900")
     drv = webdriver.Chrome(options=opts)
     try:
-        drv.get(PAGE_URL)
+        drv.get(server)
         WebDriverWait(drv, PAGE_READY_TIMEOUT).until(
             lambda d: d.execute_script(
                 "return window.PYODIDE_READY === true || window.PYODIDE_LOAD_ERROR != null"
