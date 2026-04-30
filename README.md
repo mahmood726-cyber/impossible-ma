@@ -17,12 +17,14 @@ Applied to the 6,229 Cochrane meta-analyses in the MetaAudit corpus, 444 (7.13%)
 
 ## Run locally
 
+Selenium UI tests are excluded from the default test run (3-minute Pyodide cold start). Run them on demand with `-m selenium`.
+
 ```bash
 git clone https://github.com/mahmood726-cyber/impossible-ma.git
 cd impossible-ma
 pip install -e .
-pytest tests/ --ignore=tests/test_ui.py   # engine: 66 tests
-pytest tests/test_ui.py                   # HTML/Selenium: 22 tests
+pytest tests/                              # engine: 66 tests (default; ~37s)
+pytest -m selenium tests/                  # HTML/Selenium: 22 tests (~12 min cold)
 ```
 
 CLI:

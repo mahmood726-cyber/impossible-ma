@@ -21,4 +21,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "experiments/tests"]
-addopts = "-v --tb=short"
+addopts = "-v --tb=short -m 'not selenium'"
+markers = [
+    "selenium: tests requiring Selenium + Pyodide (slow, ~3 min Pyodide cold start). Skipped by default; run with `pytest -m selenium tests/`.",
+]
