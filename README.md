@@ -23,7 +23,7 @@ Selenium UI tests are excluded from the default test run (3-minute Pyodide cold 
 git clone https://github.com/mahmood726-cyber/impossible-ma.git
 cd impossible-ma
 pip install -e .
-pytest tests/                              # engine: 157 tests (default; ~50s)
+pytest                                     # engine: 182 passed, 3 skipped (default; ~30s)
 pytest -m selenium tests/                  # HTML/Selenium: 25 tests (~12 min cold)
 ```
 
@@ -37,7 +37,7 @@ impossible-ma k1 k1.json --sign
 
 - `src/impossible_ma/` — Python engine (envelope dataclass, k=1, missing_se, adversarial, TruthCert, CLI)
 - `impossible-ma.html` — single-file browser app (51 KB, Pyodide + Plotly)
-- `tests/` — 157 engine + 25 Selenium
+- `tests/` — 185 engine (default; 182 pass, 3 skip) + 25 Selenium
 - `paper/` — E156, F1000, BMJ Methods drafts + shared refs.bib + 3 figures
 - `scripts/` — preflight, build_html, headline_run, export_figures
 

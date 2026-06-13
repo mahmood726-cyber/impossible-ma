@@ -673,9 +673,16 @@ def test_cli_route_d_replay(tmp_path):
     }
     spec_path = tmp_path / "spec.json"
     spec_path.write_text(json.dumps(spec), encoding="utf-8")
+    # The subprocess does not inherit conftest's sys.path injection, so make the
+    # src/ package discoverable via PYTHONPATH (works whether or not the package
+    # is pip-installed).
+    import os
+    src_dir = Path(__file__).resolve().parents[1] / "src"
+    env = dict(os.environ)
+    env["PYTHONPATH"] = str(src_dir) + os.pathsep + env.get("PYTHONPATH", "")
     proc = subprocess.run(
         ["python", "-m", "impossible_ma.cli", "missing_se", str(spec_path)],
-        capture_output=True, text=True, check=True,
+        capture_output=True, text=True, check=True, env=env,
     )
     out = json.loads(proc.stdout)
     assert "results" in out
