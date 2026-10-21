@@ -59,4 +59,4 @@ MIT. See `LICENSE`.
 
 ## Cite
 
-See `CITATION.cff`. Formal citation via Synthesis journal when the software paper is published (DOI pending submission).
+See `CITATION.cff`. Published article: Ahmad M. (2026). ImpossibleMA: Bounded Synthesis of Cochrane Meta-Analyses Declared Unpoolable. *Synthēsis*. https://synthesis-medicine.org/index.php/journal/article/view/impossible-ma (DOI not yet registered).
